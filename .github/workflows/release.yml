@@ -73,7 +73,8 @@ jobs:
             --output-signature blob.sig \
             blob.txt
           echo "----- SAN (look for the URI) -----"
-          openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Alternative Name"
+          # cosign writes --output-certificate base64-encoded; decode before parsing.
+          base64 -d cert.pem | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"
 
   release:
     permissions:
