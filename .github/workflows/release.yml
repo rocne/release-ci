@@ -1,0 +1,212 @@
+name: Release (reusable)
+
+# Reusable release pipeline. Callers decide WHEN + at WHAT version; this defines HOW we
+# build, sign, publish, and verify. The job checks out the CALLER's repo (default
+# actions/checkout in a reusable workflow), so goreleaser builds the caller's code and
+# the caller's e2e_script is present. The install-smoke is INLINED (not a script file)
+# because a central release-ci/test/*.sh would be absent from the caller's checkout.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Tag/version to release (e.g. v0.6.1); the tag already exists."
+        required: true
+        type: string
+      goreleaser_config:
+        required: false
+        type: string
+        default: .goreleaser.yaml
+      project_name:
+        description: "GoReleaser project_name; drives dist/<project_name>_* artifact names."
+        required: true
+        type: string
+      package_name:
+        description: "apt/dnf/brew install identity. Empty → resolved to project_name."
+        required: false
+        type: string
+        default: ""
+      binary:
+        description: "Installed binary name, for the smoke --version check."
+        required: true
+        type: string
+      cloudsmith_repo:
+        required: false
+        type: string
+        default: rocne/releases
+      language:
+        required: false
+        type: string
+        default: go
+      e2e_script:
+        description: "Path (caller-relative) to a tool-specific post-release test; empty = skip."
+        required: false
+        type: string
+        default: ""
+      smoke_distros:
+        description: "JSON array of {image, mgr} for the install-smoke matrix."
+        required: false
+        type: string
+        default: '[{"image":"ubuntu:24.04","mgr":"apt"},{"image":"fedora:41","mgr":"dnf"}]'
+
+permissions:
+  contents: write
+  issues: write
+
+# Opt JS actions into Node 24 ahead of the forced migration. Safe no-op once default.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Prepare package signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          umask 077
+          printf '%s' "$GPG_PRIVATE_KEY" > "$RUNNER_TEMP/signing-key.asc"
+          echo "GPG_KEY_PATH=$RUNNER_TEMP/signing-key.asc" >> "$GITHUB_ENV"
+
+      - name: Install Cloudsmith CLI
+        run: pipx install cloudsmith-cli
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --config ${{ inputs.goreleaser_config }} --clean --skip=validate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ inputs.version }}
+          VERSION: ${{ inputs.version }}
+          GPG_KEY_PATH: ${{ env.GPG_KEY_PATH }}
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+          CLOUDSMITH_REPO: ${{ inputs.cloudsmith_repo }}
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/${{ inputs.project_name }}_*.tar.gz
+
+  verify:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Verify release signature and provenance
+        run: |
+          TAG="${{ inputs.version }}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
+          CHECKSUMS="${{ inputs.project_name }}_${TAG}_checksums.txt"
+          ARCHIVE="${{ inputs.project_name }}_${TAG}_linux_amd64.tar.gz"
+          curl -fsSL -o "$CHECKSUMS"     "$BASE/$CHECKSUMS"
+          curl -fsSL -o "$CHECKSUMS.sig" "$BASE/$CHECKSUMS.sig"
+          curl -fsSL -o "$CHECKSUMS.pem" "$BASE/$CHECKSUMS.pem"
+          curl -fsSL -o "$ARCHIVE"       "$BASE/$ARCHIVE"
+          cosign verify-blob \
+            --certificate "$CHECKSUMS.pem" \
+            --signature   "$CHECKSUMS.sig" \
+            --certificate-identity-regexp "^https://github\.com/rocne/release-ci/\.github/workflows/release\.yml@refs/tags/v" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$CHECKSUMS"
+          gh attestation verify "$ARCHIVE" --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open issue on failure
+        if: failure()
+        run: |
+          gh issue create \
+            --title "release verify failure: ${{ inputs.version }}" \
+            --body "Signature/provenance verification failed for [${{ inputs.version }}](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  package-repo-smoke:
+    needs: release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.smoke_distros) }}
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install from the Cloudsmith repo and verify
+        env:
+          MGR: ${{ matrix.mgr }}
+          PKG: ${{ inputs.package_name || inputs.project_name }}
+          REPO_SLUG: ${{ inputs.cloudsmith_repo }}
+          BINARY: ${{ inputs.binary }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euxo pipefail
+          VER="${VERSION#v}"
+          case "$MGR" in
+            apt)
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y curl sudo
+              curl -1sLf "https://dl.cloudsmith.io/public/${REPO_SLUG}/setup.deb.sh" | bash
+              for i in 1 2 3 4 5; do
+                { apt-get update && apt-get install -y "$PKG" && break; } \
+                  || { echo "retry $i: $PKG not in index yet"; sleep 15; }
+              done
+              ;;
+            dnf)
+              dnf install -y curl sudo
+              curl -1sLf "https://dl.cloudsmith.io/public/${REPO_SLUG}/setup.rpm.sh" | bash
+              for i in 1 2 3 4 5; do
+                dnf install -y "$PKG" && break \
+                  || { echo "retry $i: $PKG not in index yet"; sleep 15; }
+              done
+              ;;
+            *)
+              echo "unknown MGR: $MGR (expected apt or dnf)" >&2
+              exit 2
+              ;;
+          esac
+          command -v "$BINARY"
+          "$BINARY" --version
+          "$BINARY" --version | grep -F "$VER"
+
+  e2e:
+    needs: release
+    if: inputs.e2e_script != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run e2e (${{ inputs.e2e_script }})
+        run: bash "${{ inputs.e2e_script }}"
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Open issue on failure
+        if: failure()
+        run: |
+          gh issue create \
+            --title "e2e failure: ${{ inputs.version }}" \
+            --body "e2e failed for [${{ inputs.version }}](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
