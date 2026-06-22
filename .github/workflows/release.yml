@@ -7,7 +7,6 @@ name: Release (reusable)
 # because a central release-ci/test/*.sh would be absent from the caller's checkout.
 
 on:
-  workflow_dispatch:
   workflow_call:
     inputs:
       version:
@@ -59,23 +58,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  _proto_san:
-    permissions:
-      id-token: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: sigstore/cosign-installer@v3
-      - name: Sign a blob and dump the certificate identity
-        run: |
-          echo "proto" > blob.txt
-          cosign sign-blob --yes \
-            --output-certificate cert.pem \
-            --output-signature blob.sig \
-            blob.txt
-          echo "----- SAN (look for the URI) -----"
-          # cosign writes --output-certificate base64-encoded; decode before parsing.
-          base64 -d cert.pem | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"
-
   release:
     permissions:
       contents: write
