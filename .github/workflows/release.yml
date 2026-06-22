@@ -130,7 +130,12 @@ jobs:
             --certificate-identity-regexp "^https://github\.com/rocne/release-ci/\.github/workflows/release\.yml@refs/tags/v" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$CHECKSUMS"
-          gh attestation verify "$ARCHIVE" --repo "${{ github.repository }}"
+          # The SLSA attestation is signed by THIS reusable workflow's identity
+          # (Fulcio SAN = the reusable workflow, not the caller), so the signer
+          # must be pinned explicitly — same gotcha as the cosign identity above.
+          gh attestation verify "$ARCHIVE" \
+            --repo "${{ github.repository }}" \
+            --signer-workflow rocne/release-ci/.github/workflows/release.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -138,6 +143,7 @@ jobs:
         if: failure()
         run: |
           gh issue create \
+            --repo "${{ github.repository }}" \
             --title "release verify failure: ${{ inputs.version }}" \
             --body "Signature/provenance verification failed for [${{ inputs.version }}](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         env:
@@ -159,6 +165,10 @@ jobs:
           REPO_SLUG: ${{ inputs.cloudsmith_repo }}
           BINARY: ${{ inputs.binary }}
           VERSION: ${{ inputs.version }}
+        # Force bash: the matrix container's default shell is `sh` (dash on
+        # ubuntu), which rejects `set -o pipefail`. bash is present in the
+        # apt/dnf base images this smoke targets.
+        shell: bash
         run: |
           set -euxo pipefail
           VER="${VERSION#v}"
