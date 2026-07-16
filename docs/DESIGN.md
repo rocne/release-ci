@@ -27,6 +27,14 @@ decisions, several of which are marked *re-derived* below.
 | **§2's posture itself** | We claim broad licence to redesign downstream. If that licence is being used to justify churn rather than correctness, say so — D11 (renaming a flag) is the most likely offender |
 | **Scale sanity generally** | 4 repos, 1 maintainer, ~110 releases total. Several proposals here (propagation robots, container test matrices, hash-pinned requirements) may be ceremony. **We would rather be told to do less** |
 
+**Read these first — they are the handoff, and this document is not trustworthy without them:**
+
+| § | what it gives you |
+|---|---|
+| **§11 Maintainer directives** | Which decisions came **from the maintainer** (M1–M9, quoted) and which the agent invented. §2's posture was *given*, not inferred. Without this you cannot tell whose judgement you are reviewing |
+| **§12 Options considered** | What was already rejected and **the one specific reason each failed**. Several are good ideas that die on a single checkable fact. Don't re-litigate without new evidence |
+| **§13 Mistakes made** | **14 of ours, 5 inherited.** Every one came from accepting a claim instead of checking it; every one died to a single command. Calibrate your trust here |
+
 **What is settled and why** — please don't re-litigate without new evidence; each was
 checked against primary sources this week, and the checks are in
 [`reference/findings-2026-07-16.md`](reference/findings-2026-07-16.md):
@@ -595,3 +603,139 @@ and starts being a design.
 exists because someone asked whether we had considered the org migration — it had been
 recorded as a standing constraint for eight rounds and never once checked against a decision.
 **That question should be put to every standing constraint in this document.**
+
+## 11. Maintainer directives
+
+**The authority behind this document.** §2's posture is not an inference the agent drew from
+the code; it was given. Recorded here because a reader who doesn't know which decisions came
+from the maintainer and which the agent invented cannot evaluate either.
+
+Recorded from working sessions on **2026-07-16** (paraphrased where not quoted; the
+conversation is the source of truth).
+
+| # | directive | drove |
+|---|---|---|
+| **M1** | **On the install dir**: *"this is the FLOOR. 'Not tunable' is wrong. It can be tunable. The default should be the XDG bin directory, but there is absolutely not a requirement to make this non-tunable."* | D9, and the whole floor-vs-ceiling distinction (§3) |
+| **M2** | **On output**: *"`--quiet` or `--silent` is fine to suppress output… we should have 4 output 'volumes': verbose (everything and details), 'normal' (announce success, announce failure), 'quiet' (failure and changes, not no-op) and 'silent' (nothing except maybe catastrophic abort message)."* Plus: *"Actual terminology and details are up to your discretion. **Use best practices and standard terminology.**"* | D10, §6.5 |
+| **M3** | **On opt-out**: *"downstream should be able to opt in/out of any feature. E.g. they should not need to stub docs generation and supply a dummy function to make the system work, they should be able to just opt out cleanly. **Same for all else.**"* | D3, §3, and #3's fourth column |
+| **M4** | **On this document's audience**: *"These are for you, humans will not read later. Our readme will be clear and that is enough."* | Why the issues and this file are dense and agent-facing, and why the README is the human surface |
+| **M5** | **On established practice**: *"**I want to follow established practices. I do not want to reinvent wheels.** If we need to change some of what we do, that is fine. We can namespace our env var."* | D8, D19, and the whole external-survey effort. **The single most load-bearing directive** — it triggered the surveys that killed three of our assumed conventions |
+| **M6** | **On rejecting downstream**: *"keeping current system is not top priority. If we have weird stuff, if we required weird stuff, then it is acceptable to reject downstream request with a '**no, but here is what we will provide, and here is how you use it instead of what you asked for, and here is why it is better**'"* | §2's counter-offer, D9, D16 |
+| **M7** | **The reframe** (supersedes any deference in earlier drafts): *"The downstream context is intended to give us context. If we need to make changes downstream, that is ok. **If gostow's custom script isn't compatible then we change it.** WE are trying to make an excellent system that meets the needs of downstream, **including the needs they aren't aware of**, and **rejecting their declared needs if we can see a better approach**."* | §2 in full, §10, and the re-derivation of D11/D20/D21/D26/D27 |
+| **M8** | **On the org migration**: asked whether the intent to migrate from the personal account to a GitHub org with shared infra had been kept in mind. It had been *recorded* and never *tested*. | #11, §9 — the question found a live break |
+| **M9** | **On process**: *"We are not going to begin work yet. I want to resolve the whole plan. And this plan will be a proposal that I'll check with a bigger model."* | Why this is a proposal, why §0 exists, why nothing is implemented |
+
+**Note the pattern in M1, M2, M5, M6, M7**: every one of them *loosened* a constraint the
+agent had adopted from a downstream document or invented. The maintainer has consistently
+pushed toward *more* design authority and *less* deference. An agent picking this up should
+assume that direction continues.
+
+## 12. Options considered
+
+Recorded so they are not re-litigated without new evidence, and so a reviewer can see the
+shape of what was rejected. **Dismissal reasons are load-bearing** — several of these are
+good ideas that fail for one specific, checkable reason.
+
+### Delivery and tooling
+
+| option | verdict | why |
+|---|---|---|
+| **godownloader** — generate `install.sh` from `.goreleaser.yml` | **Dismissed** | Archived 2022-01-14, no successor. Its author *doubted the approach itself*. The closest thing to our ask that has ever existed, and it died (§6.1) |
+| **Wait for `goreleaser` to build it** | **Dismissed** | [#4565](https://github.com/goreleaser/goreleaser/issues/4565) open since 2024, author still intends it, go-task still on the dead generator. Waiting is indefinite |
+| **`dist`** (ex-cargo-dist) | **Dismissed** | Actively maintained (premise correction: *not* wound down). But the installer is a per-release regenerated artifact, not a stable vendored file; no presence-check/`--force`/`--version`; imports a Rust release tool |
+| **instl.sh, webi** | **Dismissed** | Require a third party **reachable at install time** — a different trust and availability model from a script in our own repo |
+| **goblin.run** | **Dismissed, hard** | **Recompiles our Go source on its servers** rather than serving our signed artifacts. Defeats the entire cosign/SLSA chain |
+| **ubi, eget, aqua, binenv, cargo-binstall** | **Dismissed** | All require a manager pre-installed ⇒ none serve the fresh-machine case, which is the only case `install.sh` exists for |
+| **A template + render step** | **Dismissed** | It is a generator with extra words (D6). The whole objection that killed godownloader |
+| **A thin-shim installer / a URL on release-ci itself** | **Dismissed** *(upstream, dstow#28)* | Two hops; the whitelisted URL wouldn't be the one that must be reachable. Recorded because it was already considered and settled |
+
+### mise
+
+| option | verdict | why |
+|---|---|---|
+| **mise as install channel** (`github` backend) | **Adopted** (#7) | Zero config, zero registry entry, verifies our attestations. **Empirically tested**, not assumed |
+| **mise as a replacement for `install.sh`** | **Dismissed** | mise must itself be installed. On a fresh machine there is no mise either. The ordering runs opposite to the naive take |
+| **mise in CI** (#6) | **Propose decline** (D24) | Can't read `go.mod` (D23), so Go is excluded; the rest is achievable without it. And it substitutes *mise's Rust reimplementation* of cosign/SLSA verification for the audited upstream binaries — in a pipeline whose product is provenance |
+| **mise `go:` backend for distribution** | **Dismissed, hard** | Builds from source. **Silently discards the entire signed-release pipeline** |
+| **mise registry short name** (`mise use -g gostow`) | **Not viable** | mise's registry has a "reasonably popular" bar these tools won't clear. `github:rocne/gostow` is the invocation |
+
+### Installer behaviour
+
+| option | verdict | why |
+|---|---|---|
+| **`--update` / self-update** | **Dismissed** | Package managers and mise own upgrades. `install.sh` puts a verified binary on a bare machine; that's all (§6.10) |
+| **`--require-signature` as floor** | **Demoted, not dismissed** | Above the floor. Mandatory cosign would fail bootstrap on exactly the fresh machines bootstrap serves (F5) |
+| **`command -v` alone** (dstow B6) | **Rejected** | Never converges — reinstalls forever if the install dir isn't on `PATH` (D16) |
+| **Install-path check alone** (mise's choice) | **Rejected** | Silently shadows an apt-managed install (D16) |
+| **Non-overridable `~/.local/bin`** (dstow B6) | **Rejected** (M1) | Both shipped scripts already contradict it. Countered with a stable default + override (D9) |
+| **`--dir`** | **Dismissed** | Incumbency only. `--install-dir` pairs with the env var (D11) |
+| **Bare `INSTALL_DIR` as deprecated fallback** | **Dismissed** | **Preserves the exact collision bug namespacing exists to fix** (D21) |
+| **`INSTALL_MAN` config var** | **Dismissed** | Encodes today's accident as config. The archive already knows (D20) |
+| **dot-dagger's `VALID_TOOLS` positional** | **Dismissed** | Dead generality — a one-entry list (D12) |
+| **Accept the rc-snippet coupling** | **Dismissed** | Surrender dressed as pragmatism. We own the snippet (D26) |
+
+### Pipeline
+
+| option | verdict | why |
+|---|---|---|
+| **`pipx install cloudsmith-cli==X.Y.Z`** | **Insufficient** | Pins 1 of 18. The other 17 resolve fresh. **This was our own first proposal and it was wrong** (#4) |
+| **`--require-hashes` + compiled requirements** | **Adopted** (D18) | The only option that closes the transitive tree. Previously dismissed by us as over-engineering |
+| **Delete `cloudsmith-cli`; `curl` the API** | **Deferred, promising** | Cloudsmith's upload is **two-step** (PUT → identifier → POST), so ~15 lines of bash + `jq` we'd own. Bigger win than any pin; a design change, not a bug fix (Q5/D18) |
+| **mise to fix the pin** | **Dismissed** | `pipx` backend is version-only in the lockfile. Doesn't verify the tree either |
+| **Version guard as `workflow_call` input** (#2) | **Likely can-but-shouldn't** | 2 of 4 sites, in 1 of 4 consumers. The "duplicated across consumers" premise was false |
+| **Propagation robot** (Q3) | **Deferred, tension acknowledged** | Needs a cross-repo PAT *in the repo holding the signing keys*, for 4 repos. But §2 and §9 both argue for it |
+
+## 13. Mistakes made
+
+**Read this before trusting anything above.** The pattern is consistent and worth knowing:
+**every error here came from accepting a claim instead of checking it**, and every one was
+caught by checking. This document is the product of a process that has been wrong repeatedly.
+
+### Ours
+
+| # | mistake | how it was caught | cost if it had shipped |
+|---|---|---|---|
+| 1 | **Reported "the install dir is not tunable" as fact.** Read it out of the issue text, repeated it to the maintainer as a requirement | Maintainer corrected (M1). Both shipped scripts already contradicted it — a 30-second grep | A non-overridable install dir, worse than what we already had |
+| 2 | **Claimed "a successful install always announces itself" was an invariant** | Maintainer corrected (M2) — it's default-level behaviour, not a law | No `--quiet`. Unusable in scripts |
+| 3 | **Said `pipx install cloudsmith-cli==X.Y.Z` closes the supply-chain hole** | Checked PyPI: 17 of 18 deps are open ranges | A "fixed" issue that fixed ~1/17th of the surface |
+| 4 | **Dismissed `--require-hashes` as "more machinery than this warrants"** | Same check. It is the *only* thing that closes it | The actual fix, rejected on vibes |
+| 5 | **Asked whether to retry a dead research agent, then didn't** | Maintainer asked *"did we resume that research?"* | The single most important thread — "has this been solved?" — stayed unanswered for a round |
+| 6 | **Used hud's missing `install.sh` as evidence for the opt-out doctrine** | `gh release list`: hud has **0 releases**. Its absence is "not yet", not "declined" | A design principle propped up by a fact that wasn't one |
+| 7 | **D6 claimed the canonical script is "executable with release-ci's own values"** | release-ci **ships no binary**. The sentence was incoherent | A design whose central artifact can't exist |
+| 8 | **Claimed vendoring "survives infra reorgs"** | Tested against the migration: the vendored script **hard-aborts** on the signing identity | The stated rationale for the delivery model, false in the way that matters |
+| 9 | **Treated the org migration as a footnote for 8 rounds** despite it being a recorded constraint in #3 | Maintainer asked directly (M8) | Discovering #11 *during* the migration: every install breaking at once |
+| 10 | **Wrote "requirements are inputs, not mandates" while deferring to incumbency in 6 places** | Maintainer reframed (M7); grep found all six | Two wrong decisions (D11, D21) and two mis-shaped ones (D20, D26) |
+| 11 | **Justified the floor as protecting consumers from us** | The reframe. It's backwards — consumers are ours to change; the floor is for *users'* machines | The wrong mental model, which is what produced #10 |
+| 12 | **Cited the dstow survey's "identical except X" claim in #1's body** before diffing the scripts | Ran the diff. There's a second structural divergence | A canonical design built on an unverified comparison |
+| 13 | **Briefed a research agent that axodotdev had "wound down"** — a false premise, stated as fact | **The agent corrected me.** `dist` is actively released | A candidate dismissed for a reason that wasn't true |
+| 14 | **Edited `main` while the PR it depended on was unmerged** | Register showed D1–D24; D25–D27 and §10 had silently failed to apply | A document with dangling references to sections that don't exist |
+
+### Inherited — sources that failed verification
+
+| source | claim | reality |
+|---|---|---|
+| dstow release-installer survey §2.1 | *"dot-dagger's install.sh is essentially the same script minus the man page/completions block"* | **False.** A second structural divergence in the argument parser. It ran no diff |
+| dstow release-installer survey §1 | *"both gostow and dot-dagger have a hand-rolled refuse-v1.0.0 guard"* | **False.** dot-dagger has none. Zero hits |
+| dstow DESIGN.md §9 | advertises requirements **"B1–B9"** | **B7 and B9 were never written into it** — they exist only in an issue ledger |
+| our own conventions survey | *"errors to stderr, info to stdout — the one true, unanimous convention"* | **False.** Falsified by its own closest precedent: mise and Volta route info to **stderr** |
+| our own mise survey | *"closing the cloudsmith-cli gap is the strongest case for mise in CI"* | **False.** The `pipx` backend is version-only. It closes nothing |
+
+### The rule this produced
+
+**D14: verify before citing.** Structural descriptions in these documents have held up.
+**Cross-repo comparative claims have not** — five of five checked were wrong. The cheap tell
+is a sentence containing *"identical"*, *"both"*, *"all"*, or *"every"* about more than one
+repo. Check it before building on it.
+
+### For the reviewer
+
+Two things follow from this list.
+
+1. **The corrections came from checking, not from thinking harder.** Every mistake above
+   survived multiple careful re-readings and died to one command — a grep, a diff, a
+   `gh release list`, a `curl` to PyPI. If you doubt a claim here, the useful move is to run
+   something, not to reason about it.
+2. **The agent's confident prose is not evidence.** This document is written in a declarative
+   register throughout. Items 1, 2, 3, 4, 7, 8, and 11 above were written in exactly that
+   register and were wrong. Weight the VERIFIED tags in
+   [`reference/findings-2026-07-16.md`](reference/findings-2026-07-16.md), not the tone here.
