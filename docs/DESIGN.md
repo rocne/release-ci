@@ -149,8 +149,15 @@ Authored here, vendored to each consumer's repo root, served from that consumer'
 raw-on-`main` URL (`raw.githubusercontent.com/rocne/<repo>/main/install.sh`).
 
 Rationale: one hop; one whitelist-obvious URL on the product repo; audit-in-context;
-survives the eventual org migration; vendored updates transit each consumer's own PR review
-+ shellcheck CI rather than bypassing release gates.
+vendored updates transit each consumer's own PR review + shellcheck CI rather than bypassing
+release gates.
+
+⚠️ **Correction**: earlier drafts also claimed vendoring *"survives infra reorgs (relevant
+to the planned org migration)"*. **That claim is too broad and is withdrawn.** Vendoring may
+survive the *URL* reorg (unverified — it rests on GitHub's transfer redirects), but it does
+**not** survive the *signing identity* reorg: the vendored script pins the Fulcio identity to
+`rocne/release-ci` and **hard-aborts** when it doesn't match (#11). What vendoring actually
+buys is the first three rationales; migration-survival is not one of them. See §9.
 
 ### 6.3 Parameterization: a config block, not a generator
 
@@ -336,6 +343,7 @@ first thing to cut.
 | **D22** | `install.sh` lives at **`installer/install.sh`** here — not repo root, which would imply release-ci installs something. Canonical copy has `TOOL=""` and aborts with a usage error. Resolves Q10 |
 | **D23** | **Go stays on `actions/setup-go`** — mise's `core:go` cannot read `go.mod` (below). Resolves Q11 |
 | **D24** | **Propose declining #6** (mise in CI) — its case collapsed once Go was excluded (below) |
+| **D25** | **The Fulcio signer identity is a config-block variable** (`SIGNER_REPO`), not a literal. The org migration otherwise hard-aborts every cosign-having install; 8 hardcoded literals become 1 vendored value (§9, #11) |
 
 **D19 — the downshift is established practice.** The convention: major pinned at 0,
 breaking → **minor**, feature → **patch**. **This is not ours.** VERIFIED from primary
@@ -420,3 +428,40 @@ more tools, or if `minimum_release_age` becomes a requirement on its own.
    claims that failed inspection.
 5. **This plan may be too large for the problem.** Four repos, one maintainer, one tool that
    has ever released more than five times. §0 asks reviewers to cut rather than add.
+
+## 9. The org migration (#11)
+
+**Standing intent**: migrate these repos from the personal `rocne` account to a GitHub org
+with org-level shared secrets. Not imminent. The rule from #3 is *design for it, don't
+couple to it* — and until 2026-07-16 that rule was **recorded but never tested against the
+decisions**. It should have been; testing it found a live break.
+
+**The break**: the vendored installer pins the Fulcio identity to
+`^https://github\.com/rocne/release-ci/…` and **hard-aborts** on mismatch
+(`gostow/install.sh:149-156`). Post-migration, releases sign as `<neworg>/release-ci`, so
+**every install on a machine with cosign fails** — for every consumer, from the first
+post-migration release. Vendored scripts update on PR merge, not on release, so the fix must
+land and propagate **before** the move. The identity is hardcoded in **8 files across 5
+repos**, four of them consumer `release-dryrun.yml` signing gates.
+
+**The ordering trap**: old releases keep the old identity forever, so the installer must
+accept **both** — an alternation of two exact prefixes, not a loosened regex.
+
+**⚠️ The constraint that makes this safe**: **never free the `rocne` namespace.** If it were
+released and re-registered, that party could create `rocne/release-ci`, have Fulcio
+legitimately sign with the identity our installers trust, and serve
+`raw.githubusercontent.com/rocne/<tool>/main/install.sh` — **which rc snippets pipe into
+`sh`**. Every layer would report success. If the migration is *personal account retained +
+org created + repos transferred*, this risk is nil — but that must be **written down as a
+constraint, not left to how it happens to get done**.
+
+**How this feeds the design** (D25): the identity becomes a **config-block variable**
+(`SIGNER_REPO="rocne/release-ci"`), not a literal at line 149 of two hand-copied scripts.
+Eight hardcoded literals become one vendored value. This is the strongest concrete argument
+yet for #1 existing at all — and it is also the strongest counter-argument to Q3's
+*"don't build the propagation robot"*, since a migration needs simultaneous propagation
+across every consumer.
+
+**Also unverified, and load-bearing**: whether GitHub's transfer redirects cover
+`raw.githubusercontent.com` and `workflow_call` refs, and for how long. Do not assume.
+Redirects are void if the old namespace is re-registered.
