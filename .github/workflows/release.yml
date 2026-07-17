@@ -65,17 +65,17 @@ jobs:
       attestations: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
 
       - name: Set up Go
         if: inputs.language == 'go'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
 
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
 
       - name: Prepare package signing key
         env:
@@ -85,14 +85,35 @@ jobs:
           printf '%s' "$GPG_PRIVATE_KEY" > "$RUNNER_TEMP/signing-key.asc"
           echo "GPG_KEY_PATH=$RUNNER_TEMP/signing-key.asc" >> "$GITHUB_ENV"
 
+      # This job checks out the CALLER's repo, so release-ci's own requirements file is
+      # absent here (same reason the install-smoke is inlined). Fetch it from the exact
+      # SHA of the reusable workflow that is executing — self-consistent, no mutable ref.
+      - name: Fetch pinned Cloudsmith CLI requirements
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .release-ci
+          persist-credentials: false
+          sparse-checkout: requirements-cloudsmith.txt
+          sparse-checkout-cone-mode: false
+
+      # Hash-pinned per D18 (#4): --require-hashes closes the whole transitive tree, not
+      # just the top-level pin. Plain venv, not pipx: pipx applies --pip-args to its own
+      # shared-libs pip upgrade too, which --require-hashes then rejects (verified).
       - name: Install Cloudsmith CLI
-        run: pipx install cloudsmith-cli
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cloudsmith-cli"
+          "$RUNNER_TEMP/cloudsmith-cli/bin/pip" install --require-hashes -r .release-ci/requirements-cloudsmith.txt
+          echo "$RUNNER_TEMP/cloudsmith-cli/bin" >> "$GITHUB_PATH"
+          rm -rf .release-ci
 
       - name: Release
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
-          version: "~> v2"
+          # Exact pin (D29/D24 counter-offer). No bot advances this one — bump by hand.
+          version: v2.17.0
           args: release --config ${{ inputs.goreleaser_config }} --clean --skip=validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,7 +125,7 @@ jobs:
           CLOUDSMITH_REPO: ${{ inputs.cloudsmith_repo }}
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: dist/${{ inputs.project_name }}_*.tar.gz
 
@@ -112,7 +133,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
 
       - name: Verify release signature and provenance
         run: |
@@ -205,7 +226,7 @@ jobs:
     if: inputs.e2e_script != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Run e2e (${{ inputs.e2e_script }})
         run: bash "${{ inputs.e2e_script }}"
