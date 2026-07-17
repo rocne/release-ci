@@ -37,9 +37,9 @@ verdicts on the points we were least confident about:
 
 | § | what it gives you |
 |---|---|
-| **§11 Maintainer directives** | Which decisions came **from the maintainer** (M1–M11, quoted) and which the agent invented. §2's posture was *given*, not inferred. Without this you cannot tell whose judgement you are reviewing |
+| **§11 Maintainer directives** | Which decisions came **from the maintainer** (M1–M12, quoted) and which the agent invented. §2's posture was *given*, not inferred. Without this you cannot tell whose judgement you are reviewing |
 | **§12 Options considered** | What was already rejected and **the one specific reason each failed**. Several are good ideas that die on a single checkable fact. Don't re-litigate without new evidence |
-| **§13 Mistakes made** | **21 of ours, 5 inherited** (15–19 found by the 2026-07-17 review; 20–21 by the same-day self-review of the applied revision). Every one came from accepting a claim instead of checking it; every one died to a single command. Calibrate your trust here |
+| **§13 Mistakes made** | **22 of ours, 5 inherited** (15–19 found by the 2026-07-17 review; 20–22 by same-day follow-up passes). Every one came from accepting a claim instead of checking it; every one died to a single command. Calibrate your trust here |
 | **§14 Consumer adaptation plans** | The exact, verified change list per downstream repo — what changes, why, in what order, and what each step blocks on. This is what the per-repo roadmap issues are cut from |
 
 **What is settled and why** — please don't re-litigate without new evidence; each was
@@ -56,11 +56,12 @@ the census was corrected (dot-dagger has 141 releases, not 100); the config bloc
 `REPO` (it could not previously express dot-dagger) and lost `INSTALL_MAN` from its example;
 F2's `--version` semantics were re-derived (D28 — the inherited "implies force" contradicted
 F1 and never converged); D6's justification was rewritten from the primary sources; five new
-decisions were added (D28–D33); §10 gained eight entries; §13 gained seven mistakes (two
-from a same-day self-review of the applied revision, including a verified `--help` bug in
-both shipped scripts — D33); and **§14 is new** — the exact, verified adaptation plan for
-each downstream consumer, from which the per-repo roadmap issues are cut. The previous
-revision rewrote the posture (§2/§3) and re-derived D11/D20/D21/D26.
+decisions were added (D28–D34); §10 gained nine entries; §13 gained eight mistakes (from
+same-day follow-up passes: a verified `--help` bug in both shipped scripts — D33 — and
+D30's over-strict first form, reshaped on maintainer challenge — M12); and **§14 is new**
+— the exact, verified adaptation plan for each downstream consumer, from which the
+per-repo roadmap issues are cut. The previous revision rewrote the posture (§2/§3) and
+re-derived D11/D20/D21/D26.
 
 **Known bias to correct for**: this document was largely produced by an AI agent working
 with the maintainer, and it is long for the size of the problem. Where it reads as
@@ -191,7 +192,7 @@ not.
 |---|---|---|
 | **#4** | Pin the Cloudsmith CLI with hashes; **SHA-pin the five actions in the signing job** (D29) | **First.** Two live holes of the same class in the job holding the signing key. Hours |
 | **#1** | Canonical `install.sh` | **The main event.** Research complete; Q1/Q2 resolved (D16/D17); `--version` semantics resolved (D28); block shape corrected (§6.3). dstow blocks on it |
-| **(new)** | `--version` output contract across the four tools (D30) | Small, and #1's presence check depends on it. One sentence of spec + conformance in each consumer |
+| **(new)** | Name the implicit contracts: `--version` parse rule (D30) + artifact shape (D34) | Small, and #1's presence check and D20's detection both depend on them. State each once; assert in CI (parse rule per consumer, artifact shape in `release-dryrun`) |
 | **#8** | Pre-1.0 downshift convention | Cheap, unblocked, and **evidence-backed** (D19). One line × 3 repos |
 | **#7** | Endorse mise as an install channel | Cheap, verified working. A README stanza |
 | **#3** | Adoption audit — **shrunk to a checklist** (per review): elements × can/should/shouldn't × 5 repos. The 2026-07-16/17 censuses already did most of the measuring | Absorbs #2's verdict and Q12 |
@@ -327,12 +328,15 @@ otherwise install. Only `--force` unconditionally reinstalls. The earlier F2 inh
 dstow B6's *"`--version` implies force"* verbatim, which contradicted F1 (present at the
 requested version: F1 said exit 0, F2 said reinstall) and failed D16's own convergence
 principle for any script that pins a version (§13 #18). Version matching requires reading
-the installed tool's version — `$TOOL --version`, parsed — which is why D30 exists: the
-`--version` output format is already a de-facto contract (the release smoke greps it,
-`release.yml:201`); D28 just makes a third consumer of it. Note mise.run can version-match
-only because its server bakes the target version into the served script (verified
-2026-07-17); a static vendored script must ask the binary — and its skip-if-exists is
-**opt-in**, not default, so our default-on presence check remains our own position (§6.9).
+the installed tool's version — `$TOOL --version`, parsed per D30's rule (first
+semver-shaped token on the first line; the smoke's substring grep at `release.yml:201` was
+already format-agnostic). **Degradation is defined**: if the installed binary cannot be
+executed (wrong arch, corrupted) or no version parses from its first line, ensure treats
+the requirement as **unsatisfied and installs** — which converges, and repairs the broken
+binary as a side effect. Note mise.run can version-match only because its server bakes the
+target version into the served script (verified 2026-07-17); a static vendored script must
+ask the binary — and its skip-if-exists is **opt-in**, not default, so our default-on
+presence check remains our own position (§6.9).
 
 **dstow's B6 asked for `command -v`, and we reject it — with one fairness note.** In the
 context B6 serves, the rc snippet, `command -v` is *correct*: B1's snippet prepends
@@ -362,7 +366,10 @@ purpose — is silently absorbed. Honouring it "for continuity" keeps that colli
 forever. Two repos we own, few users, and the flag is barely documented: **clean break, note
 it in the release notes.** Simpler *and* strictly more correct.
 
-**Output levels** — settable by flag or env (`curl \| sh` can't pass flags):
+**Output levels** — settable by flag or env (`curl \| sh` can't pass flags). The env var's
+spelling is a #1 design detail with one requirement fixed here: it is **namespaced**
+(e.g. `GOSTOW_INSTALL_QUIET`) — a bare `QUIET`/`VERBOSE` exported for any unrelated purpose
+would be silently absorbed, the same collision class D8/D21 killed for `INSTALL_DIR`:
 
 | level | flag | emits |
 |---|---|---|
@@ -558,10 +565,11 @@ the **exit-code / stream / effect** split asserted independently (F6).
 | **D27** | **hud gets the installer when it releases.** *Re-derived*: Q8 said "ask hud's owner." Uniformity is the default; divergence needs a reason (§2) — a Go CLI in this family has none to lack an install story. And **hud's root-level `.goreleaser.yaml` is not a constraint on our design**: it has never been run by release-ci, so if the design wants `.goreleaser/<tool>.yaml`, hud changes. Resolves Q8 |
 | **D28** | **`--version` = ensure exactly that version**: satisfied → status line + exit 0; otherwise install; only `--force` unconditionally reinstalls (§6.5). *Replaces* the inherited "implies force" (dstow B6), which contradicted F1 and reinstalled forever for pinned-version scripts — failing D16's own convergence principle |
 | **D29** | **SHA-pin every action in the signing job**, with Dependabot/Renovate advancing the pins. `checkout@v6`, `setup-go@v6`, `cosign-installer@v3`, `goreleaser-action@v7`, `attest-build-provenance@v2` are all movable refs running beside `GPG_PRIVATE_KEY` and OIDC — the same hole class #4 closes for pipx. Extends #4's counter-offer (D24) |
-| **D30** | **`$TOOL --version` output is a contract across the four tools** — it already has two consumers (the release smoke greps it, `release.yml:201`; D28's version match parses it) and zero documentation. One sentence of spec (first line: `<binary> <semver> …`), conformance asserted per consumer |
+| **D30** | **The `--version` contract is a parse rule, not a format** *(reshaped 2026-07-17 — the strict `<binary> <semver> …` format was over-firm: stow, mise, and go each violate it, so it was never established practice; M12, §13 #22)*. The rule: **the first line of `--version` output contains the tool's own version, as the first semver-shaped token on that line.** Consumers: the release smoke (substring grep — already format-agnostic) and D28's ensure-parse. `<binary> <semver> …` survives only as **non-load-bearing house style** for greenfield tools, yielding to stronger conventions (e.g. GNU-clone fidelity — a byte-faithful `gostow (GNU Stow-compatible) version 0.4.0` still parses). Escapes, sanctioned but unbuilt: `VERSION_ARGS`/`VERSION_REGEX` as config-block variables (D6-compatible) the day a real tool needs them; a tool with no version report at all opts out cleanly — ensure degrades to force for it, documented (M3/D3) |
 | **D31** | **The canonical script is truncation-safe**: all logic in functions, one trailing `main "$@"` (§6.5). Established practice — mise.run and rustup both do it; neither shipped script does |
 | **D32** | **Resolve "latest" via the `releases/latest` redirect, not the JSON API** (§6.5). The API is rate-limited at 60/hr/IP unauthenticated and fails behind shared egress — exactly where bootstrap runs |
 | **D33** | **`--help` is a `usage()` heredoc; never read from `$0`** (§6.6). The shipped scripts' self-read idiom prints a `sed` error and **exits 0** under `curl \| sh -s -- --help` — verified 2026-07-17. Replaces §13 #20's endorsed-but-broken idiom |
+| **D34** | **The artifact shape is a named contract** (below). Asset `name_template`, checksums filename, archive-internal `man/` + `completions/` layout, and a `linux_amd64` build all live in **four per-consumer GoReleaser files** and are consumed by the installer, the verify job, the smoke, and D20's detection — uniform today only by copy-paste. D30's original disease, found by auditing for it (M12). Stated once, asserted in `release-dryrun` |
 
 **D19 — the downshift is established practice.** The convention: major pinned at 0,
 breaking → **minor**, feature → **patch**. **This is not ours.** VERIFIED from primary
@@ -619,6 +627,37 @@ that trade is bad at this price.
 **Counter-offer**: pin GoReleaser exactly in the action, hash-pin cloudsmith-cli (#4).
 That captures most of the benefit with none of the surface. **Revisit if** we adopt many
 more tools, or if `minimum_release_age` becomes a requirement on its own.
+
+**D34 — the artifact-shape contract, spelled out.** What every consumer's GoReleaser
+config must produce, because four things already depend on it:
+
+| element | shape | consumed by |
+|---|---|---|
+| archive name | `{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}.tar.gz` | installer download; verify job (`release.yml:122`) |
+| checksums name | `{{ .ProjectName }}_{{ .Tag }}_checksums.txt` (+ `.sig`/`.pem` beside it) | installer F4/F5; verify job |
+| archive internals | binary at root; man pages under `man/`, completions under `completions/` | installer install step; D20's detection |
+| build matrix | `linux_amd64` exists | verify job's fixture choice; the smoke |
+
+Today this holds in all four repos **by copy-paste, with no assertion** — the exact
+pattern D30 had. Unlike D30 it can stay firm: every side of the contract is a file we
+author. The work: state it in the canonical installer's header, and assert it in
+`release-dryrun` (which already builds a snapshot — checking the produced asset names
+against the contract is a few lines). A consumer whose GoReleaser config drifts then fails
+its own dry-run, not a user's install.
+
+**The firmness audit (M12), so it isn't re-run without new evidence.** After D30 proved
+over-firm, every stated requirement was re-examined with the same question — *is this firm
+because it must be, or because it was written firmly?* Softened: D30 (→ parse rule);
+found-and-named: D34, the output-level env var's namespacing (§6.5). **Kept firm, each for
+a stated reason**:
+
+| requirement | why firmness is correct |
+|---|---|
+| F4 checksum-or-abort | Security floor; a skip flag would be an integrity bypass one typo away. The ecosystem split (uv skips) is recorded in findings §2 — we picked the larger, safer camp deliberately |
+| F3's `~/.local/bin` default | The *default* is the contract rc snippets bake; the dir itself is fully tunable (D9/M1) — the escape valve already exists |
+| Never free the `rocne` namespace (§9) | Security invariant; any softening re-opens the squatter chain |
+| D34 artifact shape | Both sides of the contract are files we author; internal firmness costs no one anything and an assertion catches drift |
+| D6's no-template-branches rule | The one rule holding the generator door shut; escapes go through config variables, which is the sanctioned valve |
 
 ### 7.2 Still open
 
@@ -749,7 +788,8 @@ and starts being a design.
 | 12 | **Every apt/dnf machine holds a root-owned source entry baking the Cloudsmith slug** — on a slug change it silently stops updating rather than failing. The durable-artifact inventory had missed its most durable member | all apt/dnf users | §9, #11 |
 | 13 | **`brew` references `rocne/homebrew-tap` from user machines**; covered by transfer redirects only while the namespace is never freed | brew users | §9, #11 |
 | 14 | **Go module paths don't migrate** — `go install github.com/rocne/…` is advertised, and the `module` line either stays `rocne` forever or breaks existing installs | go-install users | §9, #11 |
-| 15 | **`$TOOL --version` output is already a cross-repo contract with zero documentation** — the release smoke greps it, D28's version match will parse it, and four tools currently emit whatever they like | all | D30 |
+| 15 | **`$TOOL --version` output is already a cross-repo contract with zero documentation** — the release smoke greps it, D28's version match will parse it. Resolved as a **parse rule** (first semver on line 1), not a format — a strict format was over-firm (M12) | all | D30 |
+| 19 | **Your GoReleaser config is load-bearing for four other things** — asset names, checksums name, archive layout, and a linux_amd64 build are consumed by the installer, verify job, smoke, and D20, and nothing asserts any of it. D30's disease, second instance | all | D34 |
 | 16 | **Neither shipped installer is truncation-safe** — a dropped `curl \| sh` connection executes a prefix of the script. mise.run and rustup wrap everything in functions with one trailing call | all curl\|sh users | D31 |
 | 17 | **"Latest" resolution burns an unauthenticated API call** rate-limited at 60/hr/IP — it fails behind CI and office NAT, exactly where bootstrap runs | CI, shared-egress users | D32 |
 | 18 | **Checksum-without-cosign is integrity, not authenticity** — the checksums file rides the artifact's own origin; F4 defends against corruption, not compromise. Users deserve the honest framing (and it sharpens #7's pitch: mise verifies attestations by default) | all | §6.9 |
@@ -784,6 +824,7 @@ conversation is the source of truth).
 | **M9** | **On process**: *"We are not going to begin work yet. I want to resolve the whole plan. And this plan will be a proposal that I'll check with a bigger model."* | Why this is a proposal, why §0 exists, why nothing is implemented |
 | **M10** | **On scale** (2026-07-17, during review): *"I want to do excellent, not less… make this excellent, principled, and elegantly ergonomic. And give my tools consistency. I will use my tools in my day to day."* | The review's cut criterion — complexity is cut when it doesn't buy excellence, not because it is effort. D30 (consistency as a deliverable), the §6.11 container cut, #3's shrink |
 | **M11** | **On weighting** (2026-07-17): the plan was ~4 hours of work with an agent, not a week — *"I don't want you to grant it the weight of a whole week of work."* Handoffs from prior agents are to be checked for embedded bias, not obeyed | Why the review re-verified VERIFIED tags rather than trusting them; the note below |
+| **M12** | **On contracts** (2026-07-17): challenged D30's strict format — gostow as *"a clean clone of stow"* might need to mimic stow's own output — *"I worry that it is too strict… What if my project is really strict and I simply cannot accommodate `--version`? Do we generalize or declare that out of scope?"* | D30's reshape (parse rule; format demoted to house style; escapes sanctioned but unbuilt; clean opt-out with defined degradation), and the audit for over-firm requirements that found D34 and the namespaced output env var |
 
 **Note the pattern in M1, M2, M5, M6, M7**: every one of them *loosened* a constraint the
 agent had adopted from a downstream document or invented. **Do not extrapolate this into a
@@ -880,6 +921,7 @@ caught by checking. This document is the product of a process that has been wron
 | 19 | **Claimed caarlos0 "doubted the approach, not just the maintenance burden"** — godownloader#161 is titled *"Call for Maintainers"* and his stated alternative was generation *integrated into goreleaser* | Review read the full primary text | D6 argued against an objection its author never made, leaving the real argument (scale, ownership) unstated |
 | 20 | **Endorsed the shipped scripts' `--help` self-read idiom as "good"** — `sed "$0"` cannot work when the script arrives on stdin, which is the documented invocation | Piped the script into `sh -s -- --help`: `sed: can't read sh` — **and exit 0** | The canonical installer vendoring a help flag that errors uselessly, and reports success, in its primary mode (D33) |
 | 21 | **Applied the #19 correction to §6.3 but left the retracted claim standing in §6.1 and §12** — the same mistake-#14 drift class, committed *in the revision that documented mistake #14* | Self-review pass re-read the whole document after editing | Two sections contradicting the correction they sit beside |
+| 22 | **Specified D30 as a strict output format and called it a contract** — invented under the banner of consistency, hours after writing that strictness must trace to established practice (M5). stow, mise, and go each violate it | Maintainer challenged (M12); three `--version` invocations on the maintainer's own machine falsified "established" | Either forced nonconformance on a faithful GNU-style clone, or an immediate exception that hollowed the "contract" out |
 
 ### Inherited — sources that failed verification
 
@@ -924,10 +966,14 @@ roadmap, with the block-dependencies shown.
   `${{ github.repository }}` and self-adapt (§9). Recorded here so nobody "fixes" them.
 - **Workflow refs stay `@v0.1.1`** until release-ci cuts its next tag — by hand or via the
   promoted Q12 work item; then each consumer bumps its 2 `uses:` refs.
-- **D30 conformance**: `--version` first line must read `<binary> <semver> …`. The release
-  smoke already greps for the bare version (`release.yml:201`), so a released tool almost
-  certainly passes today — the change is *asserting the format* in each repo's CI so it
-  can't silently drift.
+- **D30 conformance**: the first line of `--version` must contain the tool's own version
+  as its **first semver-shaped token** — a parse rule, not a format. (`<binary>
+  <semver> …` is house style for new tools only, and yields to stronger conventions.) The
+  release smoke already greps for the version (`release.yml:201`), so released tools pass
+  today — the change is *asserting the parse rule* in each repo's CI so it can't drift.
+- **D34 conformance**: the GoReleaser config keeps the artifact-shape contract (asset and
+  checksums name templates, `man/`/`completions/` layout, linux_amd64 build); asserted in
+  each repo's `release-dryrun` once release-ci ships the check.
 - **Vendored-file changes arrive as ordinary PRs** in each consumer, reviewed there,
   shellchecked there (D5). Nothing lands on release day.
 
@@ -937,8 +983,10 @@ roadmap, with the block-dependencies shown.
 
 1. **#8**: flip `bump-patch-for-minor-pre-major` → `true` in `release-please-config.json`
    (one line; both bump flags verified present).
-2. **D30**: current output `gostow 0.4.0 (GNU Stow 2.4.1 compatible)` already conforms;
-   add the format assertion to CI.
+2. **D30**: current output `gostow 0.4.0 (GNU Stow 2.4.1 compatible)` conforms to the
+   parse rule — its own version precedes the Stow-compat `2.4.1`, and **that ordering is
+   the load-bearing part**; add the parse-rule assertion to CI. (If gostow ever adopts
+   byte-faithful GNU formatting, `gostow (GNU Stow-compatible) version 0.4.0` also parses.)
 
 *Blocked on release-ci #1 (canonical installer exists):*
 
@@ -958,8 +1006,8 @@ roadmap, with the block-dependencies shown.
 *Unblocked now:*
 
 1. **#8**: same one-line flip (flags verified present).
-2. **D30**: assert `dotd`'s format in CI (141 releases have passed the smoke's grep, so
-   conformance is near-certain; the assertion is the new part).
+2. **D30**: assert the parse rule for `dotd` in CI (141 releases have passed the smoke's
+   grep, so conformance is near-certain; the assertion is the new part).
 
 *Blocked on release-ci #1:*
 
@@ -985,7 +1033,7 @@ Nothing here is urgent until hud decides to release (§10 #9: the pipeline has n
 2. **#8**: same one-line flip (flags verified present).
 3. **Pre-first-release checklist**: secrets set by hand (`GPG_PRIVATE_KEY`,
    `CLOUDSMITH_API_KEY`, `HOMEBREW_TAP_GITHUB_TOKEN` — the three dstow's design also
-   names); D30 format asserted (the smoke will grep it on release day); a green
+   names); D30 parse rule asserted (the smoke will grep it on release day); a green
    `release-dryrun` run.
 4. **On first release** (D27): vendor `install.sh` (`REPO="rocne/hud"`, `TOOL="hud"`),
    add the mise stanza.
