@@ -357,3 +357,37 @@ tag-bump dependency rephrased (blocked on the next tag, not specifically on auto
   values are correct.
 - gostow's `--version` first line (`gostow 0.4.0 (GNU Stow 2.4.1 compatible)`) conforms to
   D30's `<binary> <semver> …` spec as claimed.
+
+---
+
+## 8. Addendum: third pass — the firmness audit (maintainer-triggered, M12)
+
+The maintainer challenged D30's strict format ("a clean clone of stow… might not conform;
+what if my project simply cannot accommodate `--version`?"). **The challenge was correct
+and verified in one command**: `stow --version` → `stow (GNU Stow) version 2.4.1` (version
+last), `mise --version` → `2026.7.7 linux-x64 (…)` (no binary name), `go version` →
+`go version go1.26.5 (…)` (embedded semver). Three tools, three formats — the "contract"
+was a local invention, violating M5. Recorded as §13 #22 and M12.
+
+**D30 reshaped**: the contract is now a parse rule (first line contains the tool's own
+version as its first semver-shaped token); `<binary> <semver> …` demoted to non-load-bearing
+house style; `VERSION_ARGS`/`VERSION_REGEX` sanctioned as config-block escapes but unbuilt;
+no-version-at-all opts out cleanly with defined degradation (ensure → force). D28 also
+gained a defined degradation: unrunnable/unparseable installed binary = unsatisfied →
+install (converges, repairs as a side effect).
+
+**Audit for the same disease** (requirements written firmly without being checked against
+practice or given an escape valve):
+
+- **Found, same disease — D34**: the artifact shape (asset/checksums name templates,
+  `man/`+`completions/` archive layout, linux_amd64 build) lives in four per-consumer
+  GoReleaser files and is consumed by the installer, verify job, smoke, and D20 — uniform
+  by copy-paste, asserted nowhere. Named as a contract; kept firm (we author both sides);
+  assertion goes in release-dryrun.
+- **Found, minor — the output-level env var** (§6.5) was unspecified; fixed one
+  requirement now: namespaced, because a bare `QUIET`/`VERBOSE` has the identical
+  collision bug that killed bare `INSTALL_DIR` (D21).
+- **Kept firm with stated reasons** (table added to DESIGN §7.1): F4 checksum-or-abort
+  (security floor, deliberate side of a recorded ecosystem split), F3's default (the
+  escape valve — tunability — already exists), never-free-the-namespace (security
+  invariant), D6's no-template-branches rule (the sanctioned valve is config variables).
