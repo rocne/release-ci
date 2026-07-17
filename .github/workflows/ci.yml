@@ -1,0 +1,46 @@
+# release-ci's own CI: lint and test the canonical installer.
+# Named ci.yml, not release.yml — consumers already have break-glass workflows
+# named release.yml and the collision is confusing (issue #1, open question 4).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - run: shellcheck installer/install.sh installer/snippet.sh
+
+  installer-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [bash, dash] # curl … | sh is dash on Debian/Ubuntu (D17)
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: bats-core/bats-core
+          ref: 713504bc0224a19b3d7c7958c18dc07f64f54b44 # v1.12.0
+          path: .bats-core
+          persist-credentials: false
+
+      # cosign, so the suite exercises the verified-signature path (F5); the
+      # cosign-absent path runs wherever cosign isn't installed.
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
+
+      - name: Run the installer suite under ${{ matrix.shell }}
+        run: SUT_SHELL=${{ matrix.shell }} ./.bats-core/bin/bats tests/
