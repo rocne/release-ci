@@ -1,6 +1,11 @@
 # release-ci — design and plan of record
 
-Status: **proposal, for review.** Last revised 2026-07-16.
+Status: **reviewed proposal — resolving to final intent.** Last revised 2026-07-17.
+
+Adversarially reviewed 2026-07-17 against live repos and primary sources; the review is
+[`reference/plan-review-2026-07-17.md`](reference/plan-review-2026-07-17.md) and this
+revision applies it. Next step: decompose this document into a roadmap of GitHub issues
+with blocking dependencies.
 
 ---
 
@@ -17,23 +22,25 @@ better, and we try to serve the needs they haven't articulated (§10). If this d
 as high-handed, that is deliberate — an earlier draft was deferential and it produced worse
 decisions, several of which are marked *re-derived* below.
 
-**What we want from review**: adversarial reading of §7's decisions. Specifically:
+**Review status (2026-07-17)** — the adversarial review §0 previously asked for has run;
+verdicts on the points we were least confident about:
 
-| where we're least confident | why it matters |
+| where we were least confident | verdict |
 |---|---|
-| **D6 — "config block, not a generator"** (§6.3) | The load-bearing bet. GoReleaser's own installer *generator* died partly because its author doubted the approach; we claim our shape dodges that objection. If we're wrong, we rebuild a dead thing |
-| **D16 — presence-check semantics** (§6.5) | Two credible sources contradict each other (dstow's design says wider-PATH; mise's installer deliberately does the opposite and documents why). We propose doing both. Novel = suspicious |
-| **D24 — decline #6 (mise in CI)** | We killed a work item on a chain of reasoning. Chains break |
-| **§2's posture itself** | We claim broad licence to redesign downstream. If that licence is being used to justify churn rather than correctness, say so — D11 (renaming a flag) is the most likely offender |
-| **Scale sanity generally** | 4 repos, 1 maintainer, ~110 releases total. Several proposals here (propagation robots, container test matrices, hash-pinned requirements) may be ceremony. **We would rather be told to do less** |
+| **D6 — "config block, not a generator"** (§6.3) | **Reviewed: stands, on corrected legs.** The caarlos0-objection framing was an over-read (he wanted generation *integrated*, not abandoned — godownloader#161 is titled "Call for Maintainers"); the real argument is scale and ownership (§6.3). The review also found the block as previously specified could not express dot-dagger — fixed |
+| **D16 — presence-check semantics** (§6.5) | **Reviewed: the dual check stands.** The review found F1 and F2 contradicted each other on `--version`; resolved by D28 (ensure-semantics) |
+| **D24 — decline #6 (mise in CI)** | **Reviewed: endorsed.** Every link re-checked, including empirically (mise 2026.7.7 reads neither `go.mod` nor `.go-version` by default). Counter-offer extended by D29 |
+| **§2's posture itself** | **Reviewed: sound.** D11 is a real consistency gain, not churn. One guardrail applied: §11 no longer instructs future agents to extrapolate the posture |
+| **Scale sanity generally** | 4 repos, 1 maintainer, ~148 releases total. Reviewed against the maintainer's actual goal — **excellent, principled, ergonomically consistent**, not minimal. Cuts applied where complexity bought no excellence: §6.11's container layer is gone, #3 shrinks to a checklist, #2 folds into it |
 
 **Read these first — they are the handoff, and this document is not trustworthy without them:**
 
 | § | what it gives you |
 |---|---|
-| **§11 Maintainer directives** | Which decisions came **from the maintainer** (M1–M9, quoted) and which the agent invented. §2's posture was *given*, not inferred. Without this you cannot tell whose judgement you are reviewing |
+| **§11 Maintainer directives** | Which decisions came **from the maintainer** (M1–M11, quoted) and which the agent invented. §2's posture was *given*, not inferred. Without this you cannot tell whose judgement you are reviewing |
 | **§12 Options considered** | What was already rejected and **the one specific reason each failed**. Several are good ideas that die on a single checkable fact. Don't re-litigate without new evidence |
-| **§13 Mistakes made** | **14 of ours, 5 inherited.** Every one came from accepting a claim instead of checking it; every one died to a single command. Calibrate your trust here |
+| **§13 Mistakes made** | **21 of ours, 5 inherited** (15–19 found by the 2026-07-17 review; 20–21 by the same-day self-review of the applied revision). Every one came from accepting a claim instead of checking it; every one died to a single command. Calibrate your trust here |
+| **§14 Consumer adaptation plans** | The exact, verified change list per downstream repo — what changes, why, in what order, and what each step blocks on. This is what the per-repo roadmap issues are cut from |
 
 **What is settled and why** — please don't re-litigate without new evidence; each was
 checked against primary sources this week, and the checks are in
@@ -43,10 +50,17 @@ checked against primary sources this week, and the checks are in
 - Vendoring as the delivery model (§6.2).
 - The install dir is tunable (D9) — dstow's design says otherwise; both shipped scripts already contradict it.
 
-**What changed in this revision**: the posture (§2/§3) was rewritten, and four decisions were
-**re-derived** because their reasoning had been *"it's what gostow already does"* — which §2
-now rejects outright. D11 and D21 changed answer; D20 and D26 changed shape. §10 is new and
-is the point of the whole reframe.
+**What changed in this revision** (applying the 2026-07-17 review): the org-migration
+inventory in §9 was corrected (3 files, not 8 — the `release-dryrun.yml` claim was false);
+the census was corrected (dot-dagger has 141 releases, not 100); the config block gained
+`REPO` (it could not previously express dot-dagger) and lost `INSTALL_MAN` from its example;
+F2's `--version` semantics were re-derived (D28 — the inherited "implies force" contradicted
+F1 and never converged); D6's justification was rewritten from the primary sources; five new
+decisions were added (D28–D33); §10 gained eight entries; §13 gained seven mistakes (two
+from a same-day self-review of the applied revision, including a verified `--help` bug in
+both shipped scripts — D33); and **§14 is new** — the exact, verified adaptation plan for
+each downstream consumer, from which the per-repo roadmap issues are cut. The previous
+revision rewrote the posture (§2/§3) and re-derived D11/D20/D21/D26.
 
 **Known bias to correct for**: this document was largely produced by an AI agent working
 with the maintainer, and it is long for the size of the problem. Where it reads as
@@ -65,11 +79,12 @@ release-ci defines **how** — build, sign, publish, verify. That line is the wh
 Current surface: GoReleaser build → SLSA attestation → cosign/Fulcio verify → Cloudsmith
 apt/dnf install smoke → optional caller e2e.
 
-**Consumers**, verified 2026-07-16:
+**Consumers**, verified 2026-07-16, counts re-verified 2026-07-17 (the earlier "100" for
+dot-dagger was a `--limit` truncation read as a total — §13 #15):
 
 | repo | wired | releases cut | `install.sh` |
 |---|---|---|---|
-| dot-dagger | yes | 100 (v0.11.0) | yes |
+| dot-dagger | yes | 141 (v0.11.0) | yes |
 | gostow | yes | 5 (v0.4.0) | yes |
 | hud | yes | **0 — never released** | no |
 | dstow | yes | 0 (pre-release) | not yet |
@@ -160,6 +175,9 @@ to *can*.
 [`reference/`](reference/) — three external surveys plus
 [`findings-2026-07-16.md`](reference/findings-2026-07-16.md), which records what we verified
 ourselves. Every claim there is tagged VERIFIED / SOURCED / INFERRED.
+[`plan-review-2026-07-17.md`](reference/plan-review-2026-07-17.md) is the adversarial
+review this revision applies — it re-ran the load-bearing VERIFIED claims by command and
+records which held (most) and which fell (§13 #15–19).
 
 **Standing hazard**: three documents in this org have asserted cross-repo
 "identical / both / all" claims that failed inspection — including a sibling survey cited
@@ -171,13 +189,19 @@ not.
 
 | # | work | state |
 |---|---|---|
-| **#4** | Pin the Cloudsmith CLI with hashes | **First.** Live hole in the job holding the signing key. Hours |
-| **#1** | Canonical `install.sh` | **The main event.** Research complete; Q1/Q2 now resolved (D16/D17). dstow blocks on it |
-| **#8** | Pre-1.0 downshift convention | Cheap, unblocked, and now **evidence-backed** (D19). One line × 3 repos |
+| **#4** | Pin the Cloudsmith CLI with hashes; **SHA-pin the five actions in the signing job** (D29) | **First.** Two live holes of the same class in the job holding the signing key. Hours |
+| **#1** | Canonical `install.sh` | **The main event.** Research complete; Q1/Q2 resolved (D16/D17); `--version` semantics resolved (D28); block shape corrected (§6.3). dstow blocks on it |
+| **(new)** | `--version` output contract across the four tools (D30) | Small, and #1's presence check depends on it. One sentence of spec + conformance in each consumer |
+| **#8** | Pre-1.0 downshift convention | Cheap, unblocked, and **evidence-backed** (D19). One line × 3 repos |
 | **#7** | Endorse mise as an install channel | Cheap, verified working. A README stanza |
-| **#3** | Adoption audit | The big one. Gates #2 |
-| **#2** | Version guard as input | Behind #3. Likely *can-but-shouldn't* |
-| ~~#6~~ | ~~mise in CI~~ | **Propose: decline** (D24). Its case collapsed once Go was excluded |
+| **#3** | Adoption audit — **shrunk to a checklist** (per review): elements × can/should/shouldn't × 5 repos. The 2026-07-16/17 censuses already did most of the measuring | Absorbs #2's verdict and Q12 |
+| **(new)** | release-ci releases itself: release-please config here, D19 applied reflexively (Q12 promoted) | Small; gates nothing but tag discipline is currently untested |
+| **#11** | Org-migration readiness — corrected inventory (§9) plus the three newly found channels (Cloudsmith slug, brew tap, Go module path) | Not imminent; must be resolved **before** any migration date |
+| ~~#2~~ | ~~Version guard as input~~ | Folded into #3's checklist. Likely *can-but-shouldn't* |
+| ~~#6~~ | ~~mise in CI~~ | **Declined** (D24, review-endorsed). Its case collapsed once Go was excluded |
+
+**Per-consumer sequencing** — which of these each downstream repo feels, in what order,
+and what blocks on what — is **§14**, and is the source for the per-repo roadmap issues.
 
 ## 6. `install.sh` — the design (#1)
 
@@ -185,8 +209,10 @@ not.
 
 **godownloader** — GoReleaser's own generator, producing `install.sh` *from* a
 `.goreleaser.yml`, i.e. almost exactly this ask — is archived (2022-01-14), no successor
-named. Its author [doubted the approach](https://github.com/goreleaser/godownloader/issues/161),
-not just the maintenance burden. The successor he floated
+named. Its author ran out of bandwidth and
+[wondered aloud](https://github.com/goreleaser/godownloader/issues/161) whether separate
+generation had been the right shape (§6.3 has the honest reading — he wanted it
+*integrated*, not abandoned). The integration he floated
 ([goreleaser#4565](https://github.com/goreleaser/goreleaser/issues/4565)) has been **open
 since 2024**; go-task's maintainer, 2025: *"We still rely heavily on godownloader for Task,
 despite being deprecated."* The ecosystem **froze rather than migrated**.
@@ -225,24 +251,41 @@ implies *something* does the baking — and what died was a *generator*.
 
 ```sh
 # ---- vendored config (per-consumer; everything below is canonical) ----
-TOOL=""                 # binary name = repo slug under github.com/rocne/. Set at vendor time.
-INSTALL_MAN=0           # 1 for consumers shipping a man page + completions
+REPO=""                          # GitHub slug, e.g. rocne/dot-dagger. Set at vendor time.
+TOOL=""                          # installed binary name, e.g. dotd. NOT always the repo slug.
+SIGNER_REPO="rocne/release-ci"   # Fulcio identity the release is signed as (D25)
 # ---- end vendored config ----
 ```
+
+⚠️ **Correction (2026-07-17 review)**: the earlier block had a single `TOOL` with the
+comment *"binary name = repo slug"* — **false for dot-dagger** (repo `dot-dagger`, binary
+`dotd`), the family's most-released tool, and both shipped scripts already carry `REPO` and
+`TOOL` separately. The design's central artifact failed §6.3's own expressibility rule for
+1 of 4 consumers; caught by reading the consumer it claimed to serve (§13 #17). The earlier
+`INSTALL_MAN` variable is gone per D20.
 
 - **It is a working script, not a template.** No render step, no placeholder syntax.
   **Correction to an earlier draft**: that draft claimed the canonical copy runs "with
   release-ci's own values" — **wrong, release-ci ships no binary**. The canonical copy has
-  `TOOL=""` and **aborts with a usage error** (*"install.sh: TOOL is unset — this is the
-  canonical source; vendor it and set TOOL in the config block"*). That keeps it a real,
-  shellcheck-able, *executable* script that fails cleanly, rather than a template with
-  placeholders. Tests set `TOOL=gostow`.
+  `REPO=""` and `TOOL=""` and **aborts with a usage error** (*"install.sh: REPO/TOOL are
+  unset — this is the canonical source; vendor it and set the config block"*). That keeps
+  it a real, shellcheck-able, *executable* script that fails cleanly, rather than a
+  template with placeholders. Tests set `REPO=rocne/gostow TOOL=gostow`.
 - **Vendoring** = copy the file, set the block. **Propagation** = replace everything *below*
-  the block, preserve the block. A `sed`/`awk` range operation — not a generator, and it
-  cannot drift into one.
-- **Why this survives caarlos0's objection**: he doubted deriving installers *from build
-  config* — a generator with a config language, a template engine, and a compatibility
-  surface across every GoReleaser feature. We have one file and a copy step.
+  the block, preserve the block. A `sed`/`awk` range operation — honestly, a tiny generator,
+  which is why the invariant is **named and checkable**: everything below the marker is
+  **byte-identical across consumers**, and any diff there is a propagation bug. (A CI step
+  can verify vendored copies against the canonical below-the-marker; cheap to add later.)
+- **Why not a generator — corrected justification** (the earlier draft over-read its
+  source; §13 #19). godownloader#161 is titled *"Call for Maintainers"*: caarlos0's doubt
+  was about maintaining generation as a **separate project on zero bandwidth**, and his
+  preferred fix — *"maybe it would be better to make this a pipe on goreleaser?"* — is
+  generation *integrated*, not abandoned (#4565 is him still wanting to build it). The
+  honest argument for our shape is **scale and ownership**: godownloader owed strangers
+  fidelity across every GoReleaser feature; we owe four repos we own fidelity to one asset
+  layout we control, with a config surface of three variables. A generator's costs buy
+  nothing at n=4. What *does* carry over from godownloader's death: never own a
+  compatibility surface you don't control — which is what the rule below enforces.
 
 **The rule that keeps it honest**: consumer-specific behaviour must be expressible as
 **variables in the config block**, never as template branches. If a consumer needs something
@@ -253,7 +296,7 @@ the block can't express, that is a signal to **say no** (§2), not to add a temp
 | # | rule |
 |---|---|
 | **F1** | **Presence check** → if already installed and no overriding flag: one status line, **exit 0**. Semantics in D16 |
-| **F2** | `--force` reinstalls; `--version vX.Y.Z` installs that version and **implies force**. **No self-update** — package managers and mise own upgrades |
+| **F2** | `--force` unconditionally reinstalls; `--version vX.Y.Z` **ensures exactly that version** — exit 0 if already satisfied, installs otherwise (D28; the inherited "implies force" contradicted F1 and made pinned-version scripts reinstall forever). **No self-update** — package managers and mise own upgrades |
 | **F3** | **Install dir default resolves to `~/.local/bin`** on a machine that hasn't opted out. Consumer rc snippets may rely on it |
 | **F4** | **Checksum mandatory** — no `sha256sum`/`shasum` is a hard abort |
 | **F5** | **Cosign opportunistic** — verify iff present, else one notice and proceed. Requiring it would fail bootstrap on exactly the fresh machines bootstrap serves |
@@ -265,30 +308,49 @@ Consumers depend on **nothing** beyond F1–F6.
 
 **Presence check (D16)** — check **both**, install path first:
 
-1. **Resolved install path first.** If `$INSTALL_DIR/$TOOL` exists (and matches `--version`
-   if given) → status line, exit 0.
+1. **Resolved install path first.** If `$INSTALL_DIR/$TOOL` exists (and, when `--version`
+   is given, reports that version — see D28/D30) → status line **naming the installed
+   version**, exit 0. Naming it matters: exit-0 must not be mistakable for "latest".
    *Why first*: it **converges**. Checking only the wider PATH means a custom install dir
    that isn't on `PATH` reinstalls **forever**, never satisfying its own check.
 2. **Then `command -v $TOOL`.** If found elsewhere — e.g. `/usr/bin/$TOOL` from apt — →
    status line naming the location, exit 0. **Do not silently shadow a package-managed
-   install.** `--force` installs anyway.
+   install.** Exception: an explicit `--version` that the found copy does not satisfy
+   installs to `$INSTALL_DIR` anyway (the user asked for a version, not a location) and
+   still warns about the copy it will shadow. `--force` installs unconditionally.
 
 Each check alone fails: wider-PATH-only **never converges**; install-path-only silently
 installs a second copy beside an apt-managed one.
 
-**dstow's B6 asked for `command -v`, and that ask is simply wrong** — not a preference to be
-met halfway, but a check that reinstalls forever whenever the install dir isn't on `PATH`.
-We reject it and explain why (§2 rule 2). mise gets the other half right, deliberately
-checking only the install path *"so that skipping never leaves install_path missing"*
-(`mise.run:286-288`) — and gets the apt case wrong in exchange. **Both were solving half.
-Step 1 is mise's concern; step 2 is dstow's; neither source proposed both.**
+**`--version` semantics (D28)**: *ensure exactly this version* — satisfied → exit 0;
+otherwise install. Only `--force` unconditionally reinstalls. The earlier F2 inherited
+dstow B6's *"`--version` implies force"* verbatim, which contradicted F1 (present at the
+requested version: F1 said exit 0, F2 said reinstall) and failed D16's own convergence
+principle for any script that pins a version (§13 #18). Version matching requires reading
+the installed tool's version — `$TOOL --version`, parsed — which is why D30 exists: the
+`--version` output format is already a de-facto contract (the release smoke greps it,
+`release.yml:201`); D28 just makes a third consumer of it. Note mise.run can version-match
+only because its server bakes the target version into the served script (verified
+2026-07-17); a static vendored script must ask the binary — and its skip-if-exists is
+**opt-in**, not default, so our default-on presence check remains our own position (§6.9).
+
+**dstow's B6 asked for `command -v`, and we reject it — with one fairness note.** In the
+context B6 serves, the rc snippet, `command -v` is *correct*: B1's snippet prepends
+`~/.local/bin` to `PATH` **before** the guard, so the wider-PATH check covers the install
+path there. The ask was context-bound, not senseless. But the installer must be correct in
+**every** context — a custom install dir off `PATH`, invoked directly, reinstalls forever
+under `command -v` alone — so the rejection stands (§2 rule 2). mise gets the other half
+right, deliberately checking only the install path *"so that skipping never leaves
+install_path missing"* (`mise.run:286-288`) — and gets the apt case wrong in exchange.
+**Both were solving half. Step 1 is mise's concern; step 2 is dstow's; neither source
+proposed both.**
 
 **Install directory** — precedence, highest first:
 
 | | source | note |
 |---|---|---|
 | 1 | `--install-dir <path>` | **renamed from `--dir`** (D11). Pairs with the env var below; fnm's spelling. Change the two shipped scripts |
-| 2 | `<TOOL>_INSTALL_DIR` | namespaced, baked with the slug. **No surveyed installer exposes a bare one** |
+| 2 | `<TOOL>_INSTALL_DIR` | namespaced, baked from the **binary name** (`GOSTOW_…`, `DOTD_…` — `TOOL`, not the repo slug). **No surveyed installer exposes a bare one** |
 | 3 | `$XDG_BIN_HOME` | follows **uv specifically** (1 of 15 surveyed), not a broad norm |
 | 4 | `~/.local/bin` | default (F3) |
 
@@ -320,14 +382,35 @@ Announcement matrix, **at default level**:
 runtime, 2 usage. Errors carry `error:` + `hint:`. `NO_COLOR` honoured; TTY check before
 colour/progress.
 
+**Structure — truncation safety (D31)**: all logic lives in functions; the file ends with a
+single `main "$@"` call. A dropped `curl | sh` connection then executes *nothing* rather
+than a prefix of the script. Established practice (M5): mise.run is fully
+function-wrapped with one trailing call (verified 2026-07-17); rustup equivalent. Neither
+shipped script does this today — it is a property of the bare invocation the floor
+protects, so the canonical script adopts it from day one.
+
+**Latest-version resolution (D32)**: resolve via the `releases/latest` **redirect**
+(`curl -sI https://github.com/$REPO/releases/latest` → `Location` header), not the JSON
+API. Both shipped scripts curl `api.github.com`, which is rate-limited at 60/hr/IP
+unauthenticated — it fails behind CI and office NAT, exactly where bootstrap runs. The
+redirect answers the same question with no API, no rate limit, and no JSON-by-`grep`.
+
 ### 6.6 Above the floor
 
 Free to grow, consumers depend on none of it: `--require-signature` (strict cosign; the
 opportunistic default stays), man/completions install, `--os`/`--arch`, `--dry-run`,
 `--help`, upgrade hints, the output levels themselves.
 
-`--help` prints the script's own comment header (`sed -n '2,23p' "$0" | sed 's/^# \?//'`) —
-a good idiom in both shipped scripts.
+**`--help` comes from a `usage()` heredoc, not from reading `$0` (D33).** Both shipped
+scripts print their own comment header via `sed -n '2,23p' "$0"` — and the earlier draft
+called that *"a good idiom."* **Verified broken (2026-07-17)**: under the documented
+invocation (`curl … | sh -s -- --help`), `$0` is `sh`, so the user gets
+`sed: can't read sh: No such file or directory` — **and exit 0**. It fails precisely in the
+mode the script exists for, and its hardcoded line range (gostow `2,23p`, dot-dagger
+`2,14p`) is a per-vendor drift hazard besides. A `usage()` function with a heredoc serves
+both invocation modes, needs no line arithmetic, and sits naturally inside D31's
+function-wrapped structure. The comment header stays — for humans reading the file — but
+nothing executes off it.
 
 **Man/completions (D20 — re-derived): detect, don't configure.**
 
@@ -343,10 +426,10 @@ answer isn't per-consumer preference; it's: **install them whenever the tool has
 Which the script can determine **itself**: the archive either contains `man/` and
 `completions/` or it does not. **Look, don't ask.** `--bin-only` still declines at runtime.
 
-Two wins: `INSTALL_MAN` disappears (the config block shrinks to `TOOL` + `SIGNER_REPO`,
-which strengthens D6 — less config is less generator-pressure), and dot-dagger gets man
-pages the day it ships them, with no vendored-config change and nobody remembering to flip a
-flag.
+Two wins: `INSTALL_MAN` disappears (the config block shrinks to `REPO` + `TOOL` +
+`SIGNER_REPO`, which strengthens D6 — less config is less generator-pressure), and
+dot-dagger gets man pages the day it ships them, with no vendored-config change and nobody
+remembering to flip a flag.
 
 ### 6.7 The rc snippet is ours (D26 — resolves Q4)
 
@@ -371,10 +454,15 @@ string literals."** A vendored `snippet.sh` is exactly that file. dstow's `snipp
 becomes a thin reader of a vendored artifact instead of an independent hardcoding of a
 constant it doesn't own.
 
+**Scope (clarified 2026-07-17)**: the canonical `snippet.sh` lives beside the canonical
+installer here; it is **vendored to consumers that surface an rc snippet — today that is
+dstow alone**. gostow/dot-dagger/hud get it the day they document a snippet, through the
+same pipe, and not before (clean absence, §3).
+
 **What it buys**: one source of truth for the install dir; the coupling becomes visible in a
 PR diff instead of invisible across repos; shellcheck runs on it; and when the org migration
 changes the URL (§9), the snippet propagates through the same pipe as everything else
-instead of being four separate hand-edits.
+instead of being a per-consumer hand-edit.
 
 **A need dstow hasn't articulated** — it asked for a `snippet rc` subcommand; what it needs
 is for the snippet to stay correct without anyone remembering.
@@ -383,19 +471,25 @@ is for the snippet to stay correct without anyone remembering.
 
 - **dot-dagger's `VALID_TOOLS` positional** — an optional tool name validated against a
   one-entry list. Dead generality; baked-slug is gostow's shape and it's right.
-- **`printf '%q'`** (`dot-dagger/install.sh:61`) — **not POSIX**; misbehaves under `dash`,
+- **`printf '%q'`** (`dot-dagger/install.sh:60`) — **not POSIX**; misbehaves under `dash`,
   which is exactly what `curl … | sh` invokes. A latent bug on the error path.
 - **`--update`** — dropped with F2.
 
 ### 6.9 Honest positioning
 
-Three choices are **defensible minority positions, not conventions**. The script's comments
-should say so:
+Four positions deserve honest comments in the script itself:
 
-1. **Presence-checking at all** — 5 of 15 surveyed installers do it.
+1. **Presence-checking at all** — 5 of 15 surveyed installers do it (and mise's is
+   opt-in, not default; ours is default-on).
 2. **Fully-silent presence-exit is attested nowhere** — every checking installer speaks. Our
    "speaks, exit 0" is *vindicated*; `--silent` is our own extension.
 3. **`~/.local/bin`** — 2 of 15. Most use a tool-specific dir.
+4. **Checksum-without-cosign is integrity, not authenticity.** The checksums file rides
+   the same origin as the artifact, so F4 defends against corruption and truncation — not
+   against a compromised release. Authenticity comes from cosign when present (F5,
+   `--require-signature`), and from mise's default attestation verification (#7) — the one
+   install path where it is checked without the user doing anything. Say this in the
+   comments rather than letting F4 imply more than it delivers.
 
 ### 6.10 Scope, defended
 
@@ -419,12 +513,15 @@ The floor is executable; test it directly.
   actually happened** — F6 means these are independent and must be asserted independently.
 - **Fixture**: a real published release (gostow v0.4.0) — real assets, real checksums, real
   cosign signatures. No mocked release server.
-- **Containers**: reuse the existing `smoke_distros` idea (ubuntu:24.04, fedora:41) for
-  end-to-end installs only, not for the matrix above.
+- **Matrix cells are generated, not hand-written** — bats loops over the three axes, so
+  adding a level or a flag extends the matrix without 36 hand-edits.
 
-**Reviewer check**: this may be too much for a ~200-line script. The parts we'd defend
-hardest are dash+bash and the exit-code/stream/effect split; the container matrix is the
-first thing to cut.
+**Cut (2026-07-17 review): no container layer for `install.sh`.** The earlier draft
+floated reusing `smoke_distros` containers for end-to-end installer runs. The pipeline's
+`package-repo-smoke` already exercises real containers on every release; a second
+container matrix here would re-test `curl` and `mktemp`. The honest portability risk is
+`dash`, and the bats-under-dash run covers it. The defended core is: **bash + dash**, and
+the **exit-code / stream / effect** split asserted independently (F6).
 
 ## 7. Decision register
 
@@ -439,7 +536,7 @@ first thing to cut.
 | **D5** | Deliver by vendoring, from each consumer's own raw-on-`main` URL |
 | **D6** | Parameterize via a **config block in a real script**; never a generator or template engine (§6.3) |
 | **D7** | The floor is F1–F6 (§6.4) |
-| **D8** | Install-dir env var is **namespaced** (`<TOOL>_INSTALL_DIR`); bare `INSTALL_DIR` deprecated |
+| **D8** | Install-dir env var is **namespaced** (`<TOOL>_INSTALL_DIR`); bare `INSTALL_DIR` **dropped outright** (see D21 — this row previously said "deprecated" and was never updated after D21 reversed; §13 #14's class) |
 | **D9** | Install dir is **tunable**; the *default* is contractual — declines dstow B6 with a counter-offer |
 | **D10** | Four output levels; all human output to stderr; exit code independent of level |
 | **D11** | **`--install-dir`, renamed from `--dir`** — pairs with `<TOOL>_INSTALL_DIR`; fnm's spelling. *Re-derived*: the old reasoning was "matches both shipped scripts," i.e. incumbency |
@@ -448,17 +545,23 @@ first thing to cut.
 | **D14** | Verify before citing; dstow's installer survey is unreliable prior art |
 | **D15** | Sequence per §5; #4 first; #1 not gated on #3 |
 | **D16** | **Presence check = both, install path first, then `command -v`** (§6.5). Resolves Q1 |
-| **D17** | **Testing = bats-core under bash *and* dash, real-release fixture, floor matrix** (§6.10). Resolves Q2 |
+| **D17** | **Testing = bats-core under bash *and* dash, real-release fixture, floor matrix** (§6.11). Resolves Q2 |
 | **D18** | **#4 = pin with `--require-hashes` + compiled requirements now.** The `curl`-the-API option is real but not free — Cloudsmith's upload is **two-step** (PUT → identifier → POST with deb/rpm params), so we'd own ~15 lines of bash + `jq`. **Evaluate separately; do not block the fix.** Resolves Q5 |
 | **D19** | **Adopt the downshift — it is established practice, not our invention** (below). Resolves Q6 |
 | **D20** | **Man/completions: detect from the archive, don't configure.** *Re-derived* — `INSTALL_MAN` encoded today's accident as tomorrow's config. `--bin-only` still declines. Shrinks the config block (§6.6). Resolves Q7 |
 | **D21** | **Bare `INSTALL_DIR` is dropped outright — no deprecation window.** *Re-derived, reversed*: the "compatibility fallback" preserved the exact collision bug that namespacing exists to fix (§6.5). Resolves Q9 |
-| **D22** | `install.sh` lives at **`installer/install.sh`** here — not repo root, which would imply release-ci installs something. Canonical copy has `TOOL=""` and aborts with a usage error. Resolves Q10 |
+| **D22** | `install.sh` lives at **`installer/install.sh`** here (with `snippet.sh` beside it, D26) — not repo root, which would imply release-ci installs something. Canonical copy has `REPO=""`/`TOOL=""` and aborts with a usage error. Resolves Q10 |
 | **D23** | **Go stays on `actions/setup-go`** — mise's `core:go` cannot read `go.mod` (below). Resolves Q11 |
 | **D24** | **Propose declining #6** (mise in CI) — its case collapsed once Go was excluded (below) |
-| **D25** | **The Fulcio signer identity is a config-block variable** (`SIGNER_REPO`), not a literal. The org migration otherwise hard-aborts every cosign-having install; 8 hardcoded literals become 1 vendored value (§9, #11) |
+| **D25** | **The Fulcio signer identity is a config-block variable** (`SIGNER_REPO`), not a literal. The org migration otherwise hard-aborts every cosign-having install; the consumer-side literals become 1 vendored value, leaving 2 sites in release-ci's own `release.yml` (§9, #11 — inventory corrected 2026-07-17) |
 | **D26** | **release-ci owns the rc snippet** and vendors it beside `install.sh`. It is the most durable artifact we produce and cannot be a hand-copied constant in a consumer's Go source. Fits dstow's own B2 (`go:embed` real files) better than dstow's own design does (§6.7). Resolves Q4 |
 | **D27** | **hud gets the installer when it releases.** *Re-derived*: Q8 said "ask hud's owner." Uniformity is the default; divergence needs a reason (§2) — a Go CLI in this family has none to lack an install story. And **hud's root-level `.goreleaser.yaml` is not a constraint on our design**: it has never been run by release-ci, so if the design wants `.goreleaser/<tool>.yaml`, hud changes. Resolves Q8 |
+| **D28** | **`--version` = ensure exactly that version**: satisfied → status line + exit 0; otherwise install; only `--force` unconditionally reinstalls (§6.5). *Replaces* the inherited "implies force" (dstow B6), which contradicted F1 and reinstalled forever for pinned-version scripts — failing D16's own convergence principle |
+| **D29** | **SHA-pin every action in the signing job**, with Dependabot/Renovate advancing the pins. `checkout@v6`, `setup-go@v6`, `cosign-installer@v3`, `goreleaser-action@v7`, `attest-build-provenance@v2` are all movable refs running beside `GPG_PRIVATE_KEY` and OIDC — the same hole class #4 closes for pipx. Extends #4's counter-offer (D24) |
+| **D30** | **`$TOOL --version` output is a contract across the four tools** — it already has two consumers (the release smoke greps it, `release.yml:201`; D28's version match parses it) and zero documentation. One sentence of spec (first line: `<binary> <semver> …`), conformance asserted per consumer |
+| **D31** | **The canonical script is truncation-safe**: all logic in functions, one trailing `main "$@"` (§6.5). Established practice — mise.run and rustup both do it; neither shipped script does |
+| **D32** | **Resolve "latest" via the `releases/latest` redirect, not the JSON API** (§6.5). The API is rate-limited at 60/hr/IP unauthenticated and fails behind shared egress — exactly where bootstrap runs |
+| **D33** | **`--help` is a `usage()` heredoc; never read from `$0`** (§6.6). The shipped scripts' self-read idiom prints a `sed` error and **exits 0** under `curl \| sh -s -- --help` — verified 2026-07-17. Replaces §13 #20's endorsed-but-broken idiom |
 
 **D19 — the downshift is established practice.** The convention: major pinned at 0,
 breaking → **minor**, feature → **patch**. **This is not ours.** VERIFIED from primary
@@ -487,6 +590,9 @@ Cargo/npm rather than present it as a local idea.
 **D23 — mise cannot read `go.mod`.** VERIFIED empirically: with `go.mod` declaring
 `go 1.24.4` and `mise.toml` declaring `go = "prefix:1.24"`, mise resolved **1.24.13** — the
 latest 1.24.x, ignoring `go.mod`. mise's docs confirm it reads `.go-version`, not `go.mod`.
+Re-verified 2026-07-17, and it is stronger now: mise 2026.7.7 with default settings reads
+**neither** file — `idiomatic_version_file_enable_tools` is empty by default, so even
+`.go-version` needs opt-in.
 
 This is decisive because **release-ci is a reusable workflow**: four consumers, four
 different `go.mod` files. `actions/setup-go` with `go-version-file: go.mod` reads *the
@@ -518,8 +624,8 @@ more tools, or if `minimum_release_age` becomes a requirement on its own.
 
 | # | question | recommendation | blocks |
 |---|---|---|---|
-| **Q3** | **Propagation mechanism.** How do changes reach 4 consumer repos? **§2 raises the stakes**: if we change downstream freely, propagation is a core capability, not a convenience — and §9's migration needs it *simultaneous, before a deadline* | **Still: do it manually, for now.** 4 repos. Automation needs a cross-repo PAT — a new supply-chain surface **in the repo holding the signing keys**. But the honest tension is now visible: the posture argues for the robot and the scale argues against it. **Revisit before the migration, not after** | #1 (may split) |
-| **Q12** | **Tag discipline / blast radius.** All 4 consumers pin `@v0.1.1`, the only tag ever cut, by hand, with no release-please here | #3's to answer. Note the reflexive gap: **if D19's convention is org-wide, release-ci should follow it too — and release-ci has no release-please config at all.** Possibly its own issue | #3, #2 |
+| **Q3** | **Propagation mechanism.** How do changes reach 4 consumer repos? | **Manual, and the case for the robot weakened on review**: the corrected §9 inventory makes migration-day propagation two vendored files at n=4 — comfortably manual. Automation needs a cross-repo PAT — a new supply-chain surface **in the repo holding the signing keys** — for no remaining simultaneity need. Revisit only if consumer count grows | #1 (may split) |
+| **Q12** | **Tag discipline / blast radius.** All 4 consumers pin `@v0.1.1`, the only tag ever cut, by hand, with no release-please here | **Promoted to its own work item (§5)**: release-ci gets a release-please config and follows D19 reflexively. The can/should verdicts on consumer-side pinning remain #3's | #3 |
 
 ### 7.3 Deliberately not decided here
 
@@ -540,8 +646,10 @@ more tools, or if `minimum_release_age` becomes a requirement on its own.
    claim that something "works for hud" is unevidenced.
 4. **The prior art is unreliable** (§4). Three documents in this org have made cross-repo
    claims that failed inspection.
-5. **This plan may be too large for the problem.** Four repos, one maintainer, one tool that
-   has ever released more than five times. §0 asks reviewers to cut rather than add.
+5. **Size, resolved on review (M10)**: the criterion is not "less" but *excellence per
+   unit of machinery*. The 2026-07-17 review cut what failed that test (§6.11's container
+   layer, #3's scope, #2, the propagation robot) and kept what passes it (the bats floor
+   matrix, four output levels, D26, D29–D32). New additions must pass the same test.
 
 ## 9. The org migration (#11)
 
@@ -555,8 +663,47 @@ decisions**. It should have been; testing it found a live break.
 (`gostow/install.sh:149-156`). Post-migration, releases sign as `<neworg>/release-ci`, so
 **every install on a machine with cosign fails** — for every consumer, from the first
 post-migration release. Vendored scripts update on PR merge, not on release, so the fix must
-land and propagate **before** the move. The identity is hardcoded in **8 files across 5
-repos**, four of them consumer `release-dryrun.yml` signing gates.
+land and propagate **before** the move.
+
+⚠️ **Corrected inventory (2026-07-17 review; §13 #16)**: an earlier revision claimed the
+identity was hardcoded in *"8 files across 5 repos, four of them consumer
+`release-dryrun.yml` signing gates"*. **Grep says otherwise**: every `release-dryrun.yml`
+pins `${{ github.repository }}` — a context expression that **self-adapts on transfer** —
+and each file's header says explicitly that it does not validate the central identity. The
+true inventory is **4 literal sites in 3 files across 3 repos**:
+
+| file | sites |
+|---|---|
+| `release-ci/.github/workflows/release.yml` | :130 (cosign regexp), :138 (`--signer-workflow`) |
+| `gostow/install.sh` | :149 |
+| `dot-dagger/install.sh` | :155 |
+
+Smaller and more tractable than feared: after D25, migration day touches **two sites in
+release-ci plus one vendored config value**. (The separate count of **8 `@v0.1.1`
+`workflow_call` references** — 2 per consumer × 4 — is correct, and is a different
+question: whether `uses:` refs survive transfer redirects. Still unverified; see below.)
+
+**The other channels that bake `rocne` into user machines** (2026-07-17 review; the §3
+durable-artifact inventory had missed the most durable class):
+
+- **apt/dnf sources** — every package-manager machine holds a **root-owned
+  `sources.list.d` entry** for `dl.cloudsmith.io/public/rocne/releases/…`, written by
+  Cloudsmith's setup script. If the migration moves the Cloudsmith slug, those machines
+  don't fail — they **silently stop updating**, which is worse. Either the slug is part of
+  the floor, or the migration includes a Cloudsmith redirect/dual-publish story.
+- **Homebrew** — casks publish to `rocne/homebrew-tap` (verified in gostow's GoReleaser
+  config); `brew` operations reference it from user machines. Git-level redirects cover
+  this *only* under the never-free-the-namespace constraint.
+- **Go module paths** — `go install github.com/rocne/gostow@latest` is an advertised
+  channel, and module path is identity: after transfer, either the `module` line stays
+  `github.com/rocne/…` forever (works via redirect, permanently coupled to the old name)
+  or it changes (breaking every existing `go install` and import). Decide which, in #11,
+  before the move.
+
+**The rule that finds these**: *enumerate every string a user's machine stores that
+contains the word `rocne`*, per channel — rc snippets, `sources.list.d`, brew taps,
+`go.mod` module lines, `mise.toml` backends, workflow `uses:` refs. That enumeration **is**
+the floor's real inventory, and #11 should carry it as a checklist.
 
 **The ordering trap**: old releases keep the old identity forever, so the installer must
 accept **both** — an alternation of two exact prefixes, not a loosened regex.
@@ -571,10 +718,10 @@ constraint, not left to how it happens to get done**.
 
 **How this feeds the design** (D25): the identity becomes a **config-block variable**
 (`SIGNER_REPO="rocne/release-ci"`), not a literal at line 149 of two hand-copied scripts.
-Eight hardcoded literals become one vendored value. This is the strongest concrete argument
-yet for #1 existing at all — and it is also the strongest counter-argument to Q3's
-*"don't build the propagation robot"*, since a migration needs simultaneous propagation
-across every consumer.
+Four literals in three repos become one vendored value plus two sites in release-ci's own
+`release.yml`. This remains a strong argument for #1 — but with the corrected inventory it
+**weakens the case for the propagation robot**: migration-day propagation is two files at
+n=4, comfortably manual (Q3).
 
 **Also unverified, and load-bearing**: whether GitHub's transfer redirects cover
 `raw.githubusercontent.com` and `workflow_call` refs, and for how long. Do not assume.
@@ -588,7 +735,7 @@ and starts being a design.
 
 | # | what they'd have asked for, had they seen it | affected | status |
 |---|---|---|---|
-| 1 | **The org migration will abort every install on every machine with cosign** — the Fulcio identity is pinned to `rocne` and hard-fails, across 8 files in 5 repos, and vendored scripts update on merge, not on release | all | #11, §9 |
+| 1 | **The org migration will abort every install on every machine with cosign** — the Fulcio identity is pinned to `rocne` and hard-fails (4 sites in 3 files across 3 repos — inventory corrected 2026-07-17), and vendored scripts update on merge, not on release | all | #11, §9 |
 | 2 | **Never free the `rocne` namespace** — or a squatter can have Fulcio *legitimately* sign as us, and serve the URL that rc snippets pipe into `sh` | all, permanently | #11, §9 |
 | 3 | **Your release job installs unpinned Python beside your signing key** — `pipx install cloudsmith-cli` resolves 17 transitive deps fresh, in the job that already has `GPG_PRIVATE_KEY` on disk | all | #4 |
 | 4 | **Your versioning tells Cargo/npm-minded users that every feature is a breaking change** — `feat → minor` at 0.x, when both ecosystems read minor-at-0.x as *breaking* | gostow, dot-dagger, hud | #8 |
@@ -597,12 +744,23 @@ and starts being a design.
 | 7 | **`printf '%q'` isn't POSIX** — a latent bug on the error path of a script whose entire job is being safe to pipe into `dash` | dot-dagger | D12 |
 | 8 | **Nothing on your install path consumes the provenance you pay to produce.** We emit SLSA attestations and cosign-signed checksums; `install.sh` checks a checksum and treats cosign as optional. **mise's `github` backend verifies those attestations by default** — the only thing that ever has | all | #7 |
 | 9 | **Your pipeline has never run** — wired to release-ci, zero releases cut, so the layout, secrets, and signing gate are all untested | hud | §1, D27 |
-| 10 | **Four copies of the signing identity** — `release-dryrun.yml` carries the Fulcio regex in four repos: one migration, four hand-edits, four chances to miss one | all | #3, #11 |
+| 10 | ~~Four copies of the signing identity in `release-dryrun.yml`~~ **Withdrawn (2026-07-17)** — those files pin `${{ github.repository }}` and self-adapt; the claim failed a grep (§9, §13 #16) | — | — |
+| 11 | **Your signing job trusts five mutable tags** — every action in the job holding the GPG key and OIDC is a movable ref; a retag upstream is the same hole class as #4's unpinned pipx | all | D29, #4 |
+| 12 | **Every apt/dnf machine holds a root-owned source entry baking the Cloudsmith slug** — on a slug change it silently stops updating rather than failing. The durable-artifact inventory had missed its most durable member | all apt/dnf users | §9, #11 |
+| 13 | **`brew` references `rocne/homebrew-tap` from user machines**; covered by transfer redirects only while the namespace is never freed | brew users | §9, #11 |
+| 14 | **Go module paths don't migrate** — `go install github.com/rocne/…` is advertised, and the `module` line either stays `rocne` forever or breaks existing installs | go-install users | §9, #11 |
+| 15 | **`$TOOL --version` output is already a cross-repo contract with zero documentation** — the release smoke greps it, D28's version match will parse it, and four tools currently emit whatever they like | all | D30 |
+| 16 | **Neither shipped installer is truncation-safe** — a dropped `curl \| sh` connection executes a prefix of the script. mise.run and rustup wrap everything in functions with one trailing call | all curl\|sh users | D31 |
+| 17 | **"Latest" resolution burns an unauthenticated API call** rate-limited at 60/hr/IP — it fails behind CI and office NAT, exactly where bootstrap runs | CI, shared-egress users | D32 |
+| 18 | **Checksum-without-cosign is integrity, not authenticity** — the checksums file rides the artifact's own origin; F4 defends against corruption, not compromise. Users deserve the honest framing (and it sharpens #7's pitch: mise verifies attestations by default) | all | §6.9 |
 
 **How this list gets longer**: by testing the plan against things nobody asked about. #11
 exists because someone asked whether we had considered the org migration — it had been
 recorded as a standing constraint for eight rounds and never once checked against a decision.
-**That question should be put to every standing constraint in this document.**
+**That question should be put to every standing constraint in this document.** Entries
+12–14 fell out of asking one mechanical question — *"enumerate every string a user's
+machine stores that contains `rocne`"* — once per channel (§9). Ask that question of any
+new channel before endorsing it.
 
 ## 11. Maintainer directives
 
@@ -624,11 +782,16 @@ conversation is the source of truth).
 | **M7** | **The reframe** (supersedes any deference in earlier drafts): *"The downstream context is intended to give us context. If we need to make changes downstream, that is ok. **If gostow's custom script isn't compatible then we change it.** WE are trying to make an excellent system that meets the needs of downstream, **including the needs they aren't aware of**, and **rejecting their declared needs if we can see a better approach**."* | §2 in full, §10, and the re-derivation of D11/D20/D21/D26/D27 |
 | **M8** | **On the org migration**: asked whether the intent to migrate from the personal account to a GitHub org with shared infra had been kept in mind. It had been *recorded* and never *tested*. | #11, §9 — the question found a live break |
 | **M9** | **On process**: *"We are not going to begin work yet. I want to resolve the whole plan. And this plan will be a proposal that I'll check with a bigger model."* | Why this is a proposal, why §0 exists, why nothing is implemented |
+| **M10** | **On scale** (2026-07-17, during review): *"I want to do excellent, not less… make this excellent, principled, and elegantly ergonomic. And give my tools consistency. I will use my tools in my day to day."* | The review's cut criterion — complexity is cut when it doesn't buy excellence, not because it is effort. D30 (consistency as a deliverable), the §6.11 container cut, #3's shrink |
+| **M11** | **On weighting** (2026-07-17): the plan was ~4 hours of work with an agent, not a week — *"I don't want you to grant it the weight of a whole week of work."* Handoffs from prior agents are to be checked for embedded bias, not obeyed | Why the review re-verified VERIFIED tags rather than trusting them; the note below |
 
 **Note the pattern in M1, M2, M5, M6, M7**: every one of them *loosened* a constraint the
-agent had adopted from a downstream document or invented. The maintainer has consistently
-pushed toward *more* design authority and *less* deference. An agent picking this up should
-assume that direction continues.
+agent had adopted from a downstream document or invented. **Do not extrapolate this into a
+standing bias** (an earlier revision told the next agent to "assume that direction
+continues" — withdrawn on review): a posture is a decision, not a trend line, and each new
+rejection of a downstream need still owes the full counter-offer discipline (M6). What a
+future agent *should* carry forward is the mechanism, not the direction: when a constraint
+feels inherited rather than derived, surface it to the maintainer and check it.
 
 ## 12. Options considered
 
@@ -640,7 +803,7 @@ good ideas that fail for one specific, checkable reason.
 
 | option | verdict | why |
 |---|---|---|
-| **godownloader** — generate `install.sh` from `.goreleaser.yml` | **Dismissed** | Archived 2022-01-14, no successor. Its author *doubted the approach itself*. The closest thing to our ask that has ever existed, and it died (§6.1) |
+| **godownloader** — generate `install.sh` from `.goreleaser.yml` | **Dismissed** | Archived 2022-01-14, no successor shipped. The closest thing to our ask that has ever existed, and it died of maintainer bandwidth — its author still wants generation, integrated (§6.1, §6.3, §13 #19) |
 | **Wait for `goreleaser` to build it** | **Dismissed** | [#4565](https://github.com/goreleaser/goreleaser/issues/4565) open since 2024, author still intends it, go-task still on the dead generator. Waiting is indefinite |
 | **`dist`** (ex-cargo-dist) | **Dismissed** | Actively maintained (premise correction: *not* wound down). But the installer is a per-release regenerated artifact, not a stable vendored file; no presence-check/`--force`/`--version`; imports a Rust release tool |
 | **instl.sh, webi** | **Dismissed** | Require a third party **reachable at install time** — a different trust and availability model from a script in our own repo |
@@ -665,7 +828,8 @@ good ideas that fail for one specific, checkable reason.
 |---|---|---|
 | **`--update` / self-update** | **Dismissed** | Package managers and mise own upgrades. `install.sh` puts a verified binary on a bare machine; that's all (§6.10) |
 | **`--require-signature` as floor** | **Demoted, not dismissed** | Above the floor. Mandatory cosign would fail bootstrap on exactly the fresh machines bootstrap serves (F5) |
-| **`command -v` alone** (dstow B6) | **Rejected** | Never converges — reinstalls forever if the install dir isn't on `PATH` (D16) |
+| **`command -v` alone** (dstow B6) | **Rejected** | Never converges — reinstalls forever if the install dir isn't on `PATH` (D16). Context-bound fairness note in §6.5: it *is* correct inside B1's snippet, which fixes `PATH` first |
+| **`--version` implies force** (dstow B6, was F2) | **Rejected** (D28) | Contradicted F1 outright, and pinned-version scripts never converge. `--version` = ensure exactly; only `--force` is unconditional |
 | **Install-path check alone** (mise's choice) | **Rejected** | Silently shadows an apt-managed install (D16) |
 | **Non-overridable `~/.local/bin`** (dstow B6) | **Rejected** (M1) | Both shipped scripts already contradict it. Countered with a stable default + override (D9) |
 | **`--dir`** | **Dismissed** | Incumbency only. `--install-dir` pairs with the env var (D11) |
@@ -709,6 +873,13 @@ caught by checking. This document is the product of a process that has been wron
 | 12 | **Cited the dstow survey's "identical except X" claim in #1's body** before diffing the scripts | Ran the diff. There's a second structural divergence | A canonical design built on an unverified comparison |
 | 13 | **Briefed a research agent that axodotdev had "wound down"** — a false premise, stated as fact | **The agent corrected me.** `dist` is actively released | A candidate dismissed for a reason that wasn't true |
 | 14 | **Edited `main` while the PR it depended on was unmerged** | Register showed D1–D24; D25–D27 and §10 had silently failed to apply | A document with dangling references to sections that don't exist |
+| 15 | **Reported dot-dagger at 100 releases** — a `--limit` truncation read as a total, inside the census §13 exists to protect | Review re-ran with `--paginate`: **141** | A census cited as the evidence floor, wrong about the most-released consumer |
+| 16 | **Claimed the Fulcio identity was hardcoded in "8 files across 5 repos, four of them `release-dryrun.yml` gates"** — written *after* the verify-cross-repo-claims rule, containing "four…four…four", never grepped | Review grepped: dryrun files pin `${{ github.repository }}` and self-adapt. Real inventory: 4 sites, 3 files, 3 repos | A migration plan sized 2.7× too large; §10 carried a work item for a problem that doesn't exist |
+| 17 | **Specified the config block as `TOOL` = "binary name = repo slug"** — false for dot-dagger (repo `dot-dagger`, binary `dotd`), which both shipped scripts already encode as separate `REPO`/`TOOL` | Review read the consumer the block claimed to serve | The design's central artifact unable to express 1 of 4 consumers on day one |
+| 18 | **Adopted dstow B6's "`--version` implies force" verbatim into F2** while writing F1's "matches `--version` → exit 0" — a direct contradiction, and incumbency again (§2 rule 2 applied to everything except this clause) | Review worked the state machine: present-at-requested-version had two answers | Pinned-version scripts reinstalling forever — failing D16's own convergence principle |
+| 19 | **Claimed caarlos0 "doubted the approach, not just the maintenance burden"** — godownloader#161 is titled *"Call for Maintainers"* and his stated alternative was generation *integrated into goreleaser* | Review read the full primary text | D6 argued against an objection its author never made, leaving the real argument (scale, ownership) unstated |
+| 20 | **Endorsed the shipped scripts' `--help` self-read idiom as "good"** — `sed "$0"` cannot work when the script arrives on stdin, which is the documented invocation | Piped the script into `sh -s -- --help`: `sed: can't read sh` — **and exit 0** | The canonical installer vendoring a help flag that errors uselessly, and reports success, in its primary mode (D33) |
+| 21 | **Applied the #19 correction to §6.3 but left the retracted claim standing in §6.1 and §12** — the same mistake-#14 drift class, committed *in the revision that documented mistake #14* | Self-review pass re-read the whole document after editing | Two sections contradicting the correction they sit beside |
 
 ### Inherited — sources that failed verification
 
@@ -739,3 +910,109 @@ Two things follow from this list.
    register throughout. Items 1, 2, 3, 4, 7, 8, and 11 above were written in exactly that
    register and were wrong. Weight the VERIFIED tags in
    [`reference/findings-2026-07-16.md`](reference/findings-2026-07-16.md), not the tone here.
+
+## 14. Consumer adaptation plans
+
+§2 rule 1, made operational: we change downstream freely, so the design owes each consumer
+its **exact change list** — what changes, why, and in what order. Verified against each
+repo's `origin/main`, 2026-07-17. These sections become per-repo tracking issues in the
+roadmap, with the block-dependencies shown.
+
+**Applies to every consumer (so it is said once):**
+
+- **`release-dryrun.yml`: no action, ever, for the migration.** All four pin
+  `${{ github.repository }}` and self-adapt (§9). Recorded here so nobody "fixes" them.
+- **Workflow refs stay `@v0.1.1`** until release-ci cuts its next tag — by hand or via the
+  promoted Q12 work item; then each consumer bumps its 2 `uses:` refs.
+- **D30 conformance**: `--version` first line must read `<binary> <semver> …`. The release
+  smoke already greps for the bare version (`release.yml:201`), so a released tool almost
+  certainly passes today — the change is *asserting the format* in each repo's CI so it
+  can't silently drift.
+- **Vendored-file changes arrive as ordinary PRs** in each consumer, reviewed there,
+  shellchecked there (D5). Nothing lands on release day.
+
+### 14.1 gostow — mature consumer, hand-rolled installer retires
+
+*Unblocked now:*
+
+1. **#8**: flip `bump-patch-for-minor-pre-major` → `true` in `release-please-config.json`
+   (one line; both bump flags verified present).
+2. **D30**: current output `gostow 0.4.0 (GNU Stow 2.4.1 compatible)` already conforms;
+   add the format assertion to CI.
+
+*Blocked on release-ci #1 (canonical installer exists):*
+
+3. **Replace `install.sh`** (221 hand-rolled lines) with the vendored canonical; config
+   block `REPO="rocne/gostow"`, `TOOL="gostow"`. Net behaviour changes, for the release
+   notes: **`--dir` → `--install-dir`** (D11); **bare `INSTALL_DIR` dropped** →
+   `GOSTOW_INSTALL_DIR` (D21, clean break); presence check now default-on (F1/D16);
+   `--version` = ensure (D28); gains truncation safety (D31), redirect-based latest (D32),
+   a `--help` that works when piped (D33 — the current one errors under `curl | sh`),
+   and the migration-proof `SIGNER_REPO` (D25). Man pages + completions: gostow ships them
+   in its archives, so D20's detection preserves today's behaviour with zero config.
+4. **Docs sweep**: `README.md` and `docs/SPEC.md` document `--dir`/`INSTALL_DIR`
+   (verified) — update both; add the mise stanza (#7).
+
+### 14.2 dot-dagger — the consumer that reshaped the config block
+
+*Unblocked now:*
+
+1. **#8**: same one-line flip (flags verified present).
+2. **D30**: assert `dotd`'s format in CI (141 releases have passed the smoke's grep, so
+   conformance is near-certain; the assertion is the new part).
+
+*Blocked on release-ci #1:*
+
+3. **Replace `install.sh`** (186 lines); config block `REPO="rocne/dot-dagger"`,
+   `TOOL="dotd"` — the exact pair that forced the block's `REPO`/`TOOL` split (§6.3).
+   Removals, per D12: the `VALID_TOOLS` positional (dead generality, one entry) and with
+   it the **non-POSIX `printf '%q'`** on its error path. Same release-notes items as
+   gostow (`--install-dir`, `DOTD_INSTALL_DIR`, presence check, D28).
+4. **Docs sweep**: `README.md`, `docs/getting-started/index.md`, `docs/reference/dotd.md`
+   reference `install.sh` and its flags (verified) — remove any positional-tool usage,
+   update flags; add the mise stanza (#7 — noting mise verifies dot-dagger via the SLSA
+   path, `findings §5`).
+5. **Man/completions**: ships none today (archives are binary-only — verified in
+   `.goreleaser/dotd.yaml`). No action; D20 means the day they enter the archive, the
+   installer picks them up with no vendored change.
+
+### 14.3 hud — untested consumer; everything gates on first release intent
+
+Nothing here is urgent until hud decides to release (§10 #9: the pipeline has never run).
+
+1. **Layout**: move root `.goreleaser.yaml` → `.goreleaser/hud.yaml` for family uniformity
+   (D27: it has never been run by release-ci, so this is free).
+2. **#8**: same one-line flip (flags verified present).
+3. **Pre-first-release checklist**: secrets set by hand (`GPG_PRIVATE_KEY`,
+   `CLOUDSMITH_API_KEY`, `HOMEBREW_TAP_GITHUB_TOKEN` — the three dstow's design also
+   names); D30 format asserted (the smoke will grep it on release day); a green
+   `release-dryrun` run.
+4. **On first release** (D27): vendor `install.sh` (`REPO="rocne/hud"`, `TOOL="hud"`),
+   add the mise stanza.
+
+### 14.4 dstow — greenfield consumer; its design doc needs amending
+
+dstow's first release blocks on release-ci #1 (its B3, no fallback — dstow's choice, §2).
+
+1. **Vendor `install.sh`** (`REPO="rocne/dstow"`, `TOOL="dstow"`) **and `snippet.sh`
+   beside it** (D26).
+2. **Implement `dstow snippet rc` as a `go:embed` reader of the vendored `snippet.sh`.**
+   Verified 2026-07-17: **no snippet code exists yet** — this is greenfield, not rework,
+   and it satisfies dstow's own B2 ("real files, diffable, shellcheck-able; never string
+   literals") better than an independent hardcoding would.
+3. **Amend dstow `DESIGN.md` §9** to match the counter-offers it accepts — its design doc
+   binds *dstow*, so the text must follow: B6's `command -v` → the dual check (D16); B6's
+   "`--version` implies force" → ensure-semantics (D28); B6's "`~/.local/bin` bound as
+   contract" → tunable dir with the *default* as the contract (D9/M1, which both shipped
+   siblings already practise).
+4. **Out of #8's scope**: `initial-version: 1.0.0` is deliberate (verified) — no bump-flag
+   change.
+5. **Pre-first-release checklist**: same as hud's item 3.
+
+### 14.5 sorta — no adaptation, and now we know why
+
+Verified 2026-07-17 from sorta's own workflow: it is **private, with no distribution
+pipeline** — its `release-please.yml` states the tag + GitHub release *is* the whole
+release. Staying off release-ci is **correct by design**, not a gap; this closes the
+question `findings §4` said nobody had asked. Revisit only if sorta ever ships binaries to
+machines it doesn't own.
