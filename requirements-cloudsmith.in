@@ -1,0 +1,3 @@
+# Cloudsmith CLI for the release signing job — compiled with hashes per D18 (#4).
+# Regenerate: pip-compile --generate-hashes --output-file=requirements-cloudsmith.txt requirements-cloudsmith.in
+cloudsmith-cli

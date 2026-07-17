@@ -1,0 +1,14 @@
+# Advances the pins that #4/D29 froze: action SHAs (with the trailing version
+# comments Dependabot maintains) and the hash-compiled requirements-cloudsmith.txt.
+# The exact GoReleaser version in release.yml is NOT covered — bump it by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
