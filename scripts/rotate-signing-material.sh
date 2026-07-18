@@ -23,6 +23,10 @@
 set -euo pipefail
 
 # ------------------------------------------------------------------ config ----
+# KNOWN DEBT (#29): this hard-codes the downstream roster into release-ci, which
+# is not supposed to know its consumers. Accepted temporarily; must be replaced
+# with a supplied-or-discovered roster (relocate out of release-ci, parameterize,
+# or discover via `uses: rocne/release-ci`). Same applies to bin_for() below.
 REPOS=(gostow dot-dagger hud dstow)
 # binary name per repo. A case-function, not `declare -A`, so this runs on the
 # bash 3.2 that macOS ships (associative arrays need bash 4+).
