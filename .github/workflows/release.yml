@@ -219,7 +219,20 @@ jobs:
           esac
           command -v "$BINARY"
           "$BINARY" --version
-          "$BINARY" --version | grep -F "$VER"
+          # D30 (#15): the tool's own version is the first semver-shaped token on
+          # line 1 of `--version`. Here the tag is known, so we make the stronger
+          # equals-version check (VER is already v-stripped, above); the tag-
+          # agnostic parse rule itself is asserted in each consumer's release-
+          # dryrun via assert-version-contract.sh. This supersedes the old
+          # substring grep, which matched the version anywhere on any line.
+          line1="$("$BINARY" --version 2>&1 | head -n1)"
+          got="$(printf '%s\n' "$line1" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)*' | head -n1 || true)"
+          if [ "${got#v}" != "$VER" ]; then
+            echo "::error::D30 --version parse rule: '$BINARY --version' line 1 reports '${got:-<none>}', expected '$VER'"
+            echo "  first line: $line1"
+            exit 1
+          fi
+          echo "D30 --version parse rule: OK ($BINARY $got)"
 
   e2e:
     needs: release
