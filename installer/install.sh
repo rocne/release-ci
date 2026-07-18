@@ -263,8 +263,16 @@ version_of() {
 # shadowed (mise checks only the install path and gets that case wrong).
 # Presence-checking at all is our deliberate minority stance (§6.9).
 presence_check() {
-  if [ "$FORCE" = 1 ]; then return 0; fi
   target="$INSTALL_DIR/$TOOL"
+  # A directory (or any non-file) at the target can never be installed over:
+  # mv would move the binary *inside* it and report success falsely, and every
+  # later run would call the directory "already installed" — a permanent wedge.
+  # This holds under --force too, which is why it precedes the force return.
+  if [ -e "$target" ] && [ ! -f "$target" ]; then
+    die "$target exists but is not a regular file — cannot install over it" \
+        "remove it, or pass --install-dir for a different location"
+  fi
+  if [ "$FORCE" = 1 ]; then return 0; fi
 
   if [ -e "$target" ]; then
     have=$(version_of "$target")
@@ -311,10 +319,20 @@ resolve_tag() {
   if [ -n "$REQ_VERSION" ]; then
     TAG="v$REQ_VERSION"
   else
-    latest_url=$(fetch -I -o /dev/null -w '%{url_effective}' \
-      "https://github.com/$REPO/releases/latest") \
-      || die "could not resolve the latest release of $REPO" \
-             "check the network, or pass --version vX.Y.Z"
+    # -w emits even when -f fails (0-release repo → "404 <url>", network
+    # failure → "000 <url>"; verified live 2026-07-18), so the two failures
+    # get distinct messages: a repo with no releases is not a network problem.
+    latest_meta=$(fetch -I -o /dev/null -w '%{http_code} %{url_effective}' \
+      "https://github.com/$REPO/releases/latest") || true
+    latest_code="${latest_meta%% *}"
+    latest_url="${latest_meta#* }"
+    case "$latest_code" in
+      404) die "no releases found for $REPO" \
+               "the repo has no published release yet; pass --version vX.Y.Z if you know one" ;;
+      2*|3*) ;;
+      *) die "could not resolve the latest release of $REPO" \
+             "check the network, or pass --version vX.Y.Z" ;;
+    esac
     case "$latest_url" in
       */releases/tag/*) TAG="${latest_url##*/releases/tag/}"; TAG="${TAG%%\?*}" ;;
       *) die "no releases found for $REPO" \
