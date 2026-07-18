@@ -1,0 +1,29 @@
+name: PR title
+
+# Enforce Conventional Commit PR titles. PRs are squash-merged, so the PR title
+# becomes the commit subject on main — which is exactly what release-please reads
+# to decide the next version and build the changelog. A malformed title would
+# silently drop a change from release automation, so guard it here.
+#
+# Reusable (#37; adoption audit row 5 — ruled mandatory 2026-07-18): the policy
+# lives here once; each consumer's pr-title.yml is a thin caller pinned by tag
+# (canonical caller text: docs/adoption-audit.md appendix). This repo calls it
+# via its own pull_request_target trigger below — same treatment as everyone
+# (M13). GITHUB_TOKEN flows to workflow_call callees automatically; callers
+# need no secrets block.
+
+on:
+  workflow_call: {}
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
