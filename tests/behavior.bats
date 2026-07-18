@@ -83,6 +83,62 @@ setup() { common_setup; }
   done
 }
 
+# ---- non-file at the install path -------------------------------------------
+
+@test "a directory at the install path is an error, not a false success" {
+  mkdir -p "$INSTALL_DIR/$FIXTURE_TOOL" # a DIRECTORY named like the tool
+  local shim="$WORK/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\necho "curl should never run" >&2\nexit 9\n' >"$shim/curl"
+  chmod +x "$shim/curl"
+  PATH="$shim:$PATH" run_sut --install-dir "$INSTALL_DIR"
+  assert_status 1
+  assert_stderr_contains "not a regular file"
+  assert_stderr_lacks "curl should never run"
+  [ -d "$INSTALL_DIR/$FIXTURE_TOOL" ]
+}
+
+@test "--force over a directory at the install path still aborts honestly" {
+  mkdir -p "$INSTALL_DIR/$FIXTURE_TOOL"
+  run_sut --install-dir "$INSTALL_DIR" --force --bin-only
+  assert_status 1
+  assert_stderr_contains "not a regular file"
+  [ -z "$(ls -A "$INSTALL_DIR/$FIXTURE_TOOL")" ] # nothing smuggled inside it
+}
+
+# ---- latest-resolution failures (D32) ----------------------------------------
+
+@test "a repo with no releases gets an honest error, not a network hint" {
+  local shim="$WORK/shim"
+  mkdir -p "$shim"
+  cat >"$shim/curl" <<'EOF'
+#!/bin/sh
+# GitHub's verified behavior for a 0-release repo (rocne/hud, 2026-07-18):
+# -f fails with rc 22 while -w still emits the code and final URL.
+printf '404 https://github.com/rocne/gostow/releases/latest'
+exit 22
+EOF
+  chmod +x "$shim/curl"
+  PATH="$shim:$PATH" run_sut --install-dir "$INSTALL_DIR"
+  assert_status 1
+  assert_stderr_contains "no published release yet"
+  assert_stderr_lacks "check the network"
+}
+
+@test "a network failure resolving latest blames the network" {
+  local shim="$WORK/shim"
+  mkdir -p "$shim"
+  cat >"$shim/curl" <<'EOF'
+#!/bin/sh
+printf '000 https://github.com/rocne/gostow/releases/latest'
+exit 6
+EOF
+  chmod +x "$shim/curl"
+  PATH="$shim:$PATH" run_sut --install-dir "$INSTALL_DIR"
+  assert_status 1
+  assert_stderr_contains "check the network"
+}
+
 # ---- mandatory checksum (F4) ------------------------------------------------
 
 @test "no sha256sum/shasum on PATH aborts before any download" {
