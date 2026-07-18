@@ -87,3 +87,69 @@ are in flight or done (installer vendor PRs: gostow#49, dot-dagger#206, dstow#78
   #11 already tracks (`SIGNER_REPO`, D25); row 14 explicitly defers to the migration date.
 - **Source reliability**: the 2026-07-14 survey remains cite-only-if-reverified (two
   falsified claims); everything in this file's census was measured 2026-07-18.
+
+## Appendix: canonical consumer snippets (rulings' implementation surface)
+
+The exact text consumers carry. Any drift from these is a propagation bug, same doctrine
+as the installer's below-the-block invariant.
+
+### pr-title caller (#37 — replaces each repo's policy copy at the next pin bump)
+
+```yaml
+name: PR title
+
+# Thin caller (release-ci#37): the policy lives in release-ci's reusable
+# workflow — mandatory, adoption audit row 5. Pinned per the single-pin rule.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    uses: rocne/release-ci/.github/workflows/pr-title.yml@vX.Y.Z # the repo's ONE pin
+```
+
+### Shellcheck step for vendored scripts (#39 — in each consumer's lint.yml)
+
+```yaml
+      # install.sh (and snippet.sh where vendored) is piped into `sh` from the
+      # internet; a bug in it runs on a stranger's machine. shellcheck is
+      # preinstalled on the ubuntu runner. Canonical step: release-ci#39.
+      - name: Shellcheck the vendored installer
+        run: shellcheck install.sh
+```
+
+dstow adds `snippet.sh` to the `run:` line. Repo-specific scripts (e2e suites etc.) stay
+in a separate, repo-owned step — the canonical step covers exactly the vendored files.
+
+### mise stanza (#40 — consumer READMEs, landed with the repo's first public release)
+
+```markdown
+### mise
+
+[mise](https://mise.jdx.dev) installs pinned releases and verifies their GitHub
+attestations with zero configuration:
+
+    mise use -g github:rocne/<repo>@latest
+```
+
+Empirically verified (mise survey 2026-07-16) against gostow and dot-dagger releases.
+Requires the repo to be public — dstow/hud/sorta are private today, so their stanzas wait
+for the visibility flip (recorded on dstow#64 / hud#4).
+
+### Single-pin rule (#38)
+
+A consumer repo references release-ci at **exactly one version** across all its workflows
+(`uses:` sites *and* the dryrun assert checkout's `ref:`). Bumps arrive as PRs — Dependabot
+(`github-actions` ecosystem) covers the `uses:` sites; the checkout `ref:` is bumped in the
+same PR by hand until the dryrun surface is unified. Split pins are a bug (found live
+2026-07-18: v0.1.1/v0.1.2 in all four consumers).
+
+### Break-glass workflow name (#41)
+
+The consumer-side tag-push workflow is `release-manual.yml` (was `release.yml`, colliding
+with the reusable workflow it calls). The `name:` fields were already distinct; the
+filename now is too.
