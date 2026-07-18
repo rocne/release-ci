@@ -1,0 +1,32 @@
+name: Release please
+
+# release-ci defines the org's release conventions, so it follows them itself
+# (#16 / Q12). On every push to main, release-please reads the Conventional
+# Commit history and maintains a standing "release PR" (next version +
+# CHANGELOG). Merging that release PR is the human gate: it creates the tag +
+# GitHub release.
+#
+# There is NO build/sign/publish job here — release-ci ships no binary. Its
+# product is the reusable workflows/scripts that consumers pin by `uses:` ref,
+# so the tag + GitHub release IS the whole release (same shape as sorta's).
+#
+# D19 downshift is applied reflexively in release-please-config.json
+# (bump-minor-pre-major + bump-patch-for-minor-pre-major, both true): the
+# pre-1.0 convention #8 rolls out downstream governs this repo's own bumps too.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
