@@ -825,6 +825,7 @@ conversation is the source of truth).
 | **M10** | **On scale** (2026-07-17, during review): *"I want to do excellent, not less… make this excellent, principled, and elegantly ergonomic. And give my tools consistency. I will use my tools in my day to day."* | The review's cut criterion — complexity is cut when it doesn't buy excellence, not because it is effort. D30 (consistency as a deliverable), the §6.11 container cut, #3's shrink |
 | **M11** | **On weighting** (2026-07-17): the plan was ~4 hours of work with an agent, not a week — *"I don't want you to grant it the weight of a whole week of work."* Handoffs from prior agents are to be checked for embedded bias, not obeyed | Why the review re-verified VERIFIED tags rather than trusting them; the note below |
 | **M12** | **On contracts** (2026-07-17): challenged D30's strict format — gostow as *"a clean clone of stow"* might need to mimic stow's own output — *"I worry that it is too strict… What if my project is really strict and I simply cannot accommodate `--version`? Do we generalize or declare that out of scope?"* | D30's reshape (parse rule; format demoted to house style; escapes sanctioned but unbuilt; clean opt-out with defined degradation), and the audit for over-firm requirements that found D34 and the namespaced output env var |
+| **M13** | **On uniformity** (2026-07-18): *"all repos get the same treatment. All repos get the same release system. All repos must become consistent; repos conform to the authoritative release process… we should not have exceptions."* Given when the agent left hud out of the installer-vendoring round citing §14.3's first-release gating. The audit (#3) is the instrument that determines what conforming means per element; any per-repo divergence must be a verdict it rules explicitly, never a default that accretes | §14.3 (amended — hud vendors with the family), the four-consumer vendoring round, #3's standing as overdue rather than optional |
 
 **Note the pattern in M1, M2, M5, M6, M7**: every one of them *loosened* a constraint the
 agent had adopted from a downstream document or invented. **Do not extrapolate this into a
@@ -1024,9 +1025,13 @@ roadmap, with the block-dependencies shown.
    `.goreleaser/dotd.yaml`). No action; D20 means the day they enter the archive, the
    installer picks them up with no vendored change.
 
-### 14.3 hud — untested consumer; everything gates on first release intent
+### 14.3 hud — untested consumer; conforms with the family (M13)
 
-Nothing here is urgent until hud decides to release (§10 #9: the pipeline has never run).
+⚠️ **Amended 2026-07-18 (M13).** This section previously gated everything on hud's
+"first release intent" — an exception the maintainer has eliminated: all repos get the
+same treatment and conform to the authoritative release process. What is genuinely
+*sequenced* before a first release (secrets, a green dryrun — item 3) stays sequenced;
+nothing else waits on intent.
 
 1. **Layout**: move root `.goreleaser.yaml` → `.goreleaser/hud.yaml` for family uniformity
    (D27: it has never been run by release-ci, so this is free).
@@ -1035,8 +1040,11 @@ Nothing here is urgent until hud decides to release (§10 #9: the pipeline has n
    `CLOUDSMITH_API_KEY`, `HOMEBREW_TAP_GITHUB_TOKEN` — the three dstow's design also
    names); D30 parse rule asserted (the smoke will grep it on release day); a green
    `release-dryrun` run.
-4. **On first release** (D27): vendor `install.sh` (`REPO="rocne/hud"`, `TOOL="hud"`),
-   add the mise stanza.
+4. **Vendor `install.sh` with the family** (`REPO="rocne/hud"`, `TOOL="hud"`) — M13
+   removed the on-first-release gating this item carried. Safe to ship before any release
+   exists: a 0-release repo's vendored installer exits 1 with an honest *"no published
+   release yet"* (behavior added by the pre-vendor review fixes, #34). The mise stanza
+   still lands with the first release — mise has nothing to install before one exists.
 
 ### 14.4 dstow — greenfield consumer; its design doc needs amending
 
