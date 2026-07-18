@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # assert-artifact-shape.sh — assert the D34 artifact-shape contract against a
 # GoReleaser dist/ directory. Canonical source: rocne/release-ci,
-# release-dryrun/assert-artifact-shape.sh; vendored to each consumer and called
+# release-dryrun/assert-artifact-shape.sh; consumed by each consumer via a
+# tag-pinned checkout of release-ci (owned once, never copied) and called
 # from its release-dryrun.yml after the snapshot build, so a drifting GoReleaser
 # config fails its own dry-run instead of a user's install (#24, DESIGN.md D34).
 #

@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # assert-version-contract.sh — assert the D30 --version parse rule against the
 # output of `<tool> --version`. Canonical source: rocne/release-ci,
-# release-dryrun/assert-version-contract.sh; vendored to each consumer and called
+# release-dryrun/assert-version-contract.sh; consumed by each consumer via a
+# tag-pinned checkout of release-ci (owned once, never copied) and called
 # from its release-dryrun.yml (parse-conformance, tag-agnostic), and mirrored by
 # the release smoke (release.yml, equals-version), so a tool whose --version
 # drifts fails its own dry-run instead of #1's ensure-check on a user's machine
