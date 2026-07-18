@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.3](https://github.com/rocne/release-ci/compare/v0.1.2...v0.1.3) (2026-07-18)
+
+
+### Features
+
+* assert the D30 --version parse rule ([#15](https://github.com/rocne/release-ci/issues/15)) ([06f49a8](https://github.com/rocne/release-ci/commit/06f49a8f8580087b57e9b876a2357b6d8db7d518))
+* reusable pr-title workflow; canonical consumer snippets appendix ([#37](https://github.com/rocne/release-ci/issues/37), [#38](https://github.com/rocne/release-ci/issues/38), [#39](https://github.com/rocne/release-ci/issues/39), [#40](https://github.com/rocne/release-ci/issues/40), [#41](https://github.com/rocne/release-ci/issues/41)) ([7eab24a](https://github.com/rocne/release-ci/commit/7eab24a712da4468ff0d8fa6b2e00628530feb89))
+
+
+### Bug Fixes
+
+* refuse a non-file at the install path; honest error for 0-release repos ([#1](https://github.com/rocne/release-ci/issues/1)) ([c52c37b](https://github.com/rocne/release-ci/commit/c52c37bdbe2cb533b7dde4f42669508cac10496d))
+
 ## [0.1.2](https://github.com/rocne/release-ci/compare/v0.1.1...v0.1.2) (2026-07-18)
 
 
