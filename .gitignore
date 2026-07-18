@@ -1,1 +1,7 @@
 dist/
+
+# rotate-signing-material.sh run byproducts — never commit these
+out/                 # exported public keys (written per-run)
+gpg.*.k              # local gpg key captures
+.op/                 # 1Password CLI session/cache
+rocne@*/             # host-scoped scratch dirs
