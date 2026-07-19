@@ -18,7 +18,30 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - run: shellcheck installer/install.sh installer/snippet.sh release-dryrun/assert-artifact-shape.sh
+      - run: shellcheck installer/install.sh installer/snippet.sh release-dryrun/assert-artifact-shape.sh release-dryrun/assert-version-contract.sh .githooks/pre-commit
+
+  # Secret scan, full history, every ref (adoption audit row 19). The bare
+  # pinned binary, not gitleaks/gitleaks-action: the action wrapper requires a
+  # paid license on organization accounts, which would couple this gate to a
+  # purchase at org-migration time (§9/#11); the binary is MIT and couples to
+  # nothing. Full-history-every-run beats diff-scanning here: the repos are
+  # small (the largest scans in ~1s) and it re-verifies the whole exposure
+  # surface on every push, not just the delta.
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # full history — the scan walks every commit
+          persist-credentials: false
+      - name: Download gitleaks (pinned, checksum-verified)
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan full history for secrets
+        run: ./gitleaks git . --redact --no-banner --log-opts="--all"
 
   installer-tests:
     runs-on: ubuntu-latest
