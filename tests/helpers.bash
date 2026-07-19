@@ -11,7 +11,7 @@ SUT_SHELL="${SUT_SHELL:-sh}"
 
 FIXTURE_REPO="rocne/gostow"
 FIXTURE_TOOL="gostow"
-FIXTURE_VERSION="0.4.0"   # the pinned fixture release
+FIXTURE_VERSION="0.4.1"   # the pinned fixture release (first cosign v3 bundle, #45)
 ALT_VERSION="0.3.0"       # a second real release, for ensure-mismatch cases
 
 vendor_install_sh() { # DEST — mimic vendoring: set the config block
@@ -53,9 +53,9 @@ fixture_binary() {
 }
 
 # True iff the fixture release publishes a cosign v3 Sigstore bundle beside its
-# checksums. gostow v0.4.0 predates the v3 migration (#45) and carries the old
-# detached .sig/.pem instead; the signature-verify tests skip against such a
-# release and auto-run once FIXTURE_VERSION advances to a re-pressed one.
+# checksums (#45). The pinned fixture (v0.4.1) does; this stays as a guard so
+# the signature-verify tests skip cleanly — rather than hard-fail — if the
+# fixture is ever repointed at a pre-v3 release that carries only .sig/.pem.
 fixture_has_bundle() {
   curl -fsSL -o /dev/null \
     "https://github.com/$FIXTURE_REPO/releases/download/v$FIXTURE_VERSION/${FIXTURE_TOOL}_v${FIXTURE_VERSION}_checksums.txt.sigstore.json" \
