@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.4](https://github.com/rocne/release-ci/compare/v0.1.3...v0.1.4) (2026-07-19)
+
+
+### Features
+
+* gitleaks — canonical hook + CI gate; audit rows 19/20 proposed ([c790b13](https://github.com/rocne/release-ci/commit/c790b13e3c745ff6d82f3b624dbf9e865c85a176))
+* gitleaks — canonical pre-commit hook, CI gate here, audit rows 19/20 proposed ([#3](https://github.com/rocne/release-ci/issues/3)-family) ([338acdf](https://github.com/rocne/release-ci/commit/338acdfd0404242d26c54a3d4c94a3e2673d9fbd))
+
+
+### Bug Fixes
+
+* **install:** silence curl noise on the opportunistic signature fetch ([53f05fb](https://github.com/rocne/release-ci/commit/53f05fb2e38a532318fb814d97645f4fb9881c3c))
+* **signing:** migrate cosign contract to v3 Sigstore bundle (D35, [#45](https://github.com/rocne/release-ci/issues/45)) ([0fc39a5](https://github.com/rocne/release-ci/commit/0fc39a522dbee37398d0149c13f2b53e5a7ba4d7))
+* **signing:** migrate cosign contract to v3 Sigstore bundle (D35, [#45](https://github.com/rocne/release-ci/issues/45)) ([182755a](https://github.com/rocne/release-ci/commit/182755a0cdfda3bede3b943307d010f2dd96e011))
+
 ## [0.1.3](https://github.com/rocne/release-ci/compare/v0.1.2...v0.1.3) (2026-07-18)
 
 
