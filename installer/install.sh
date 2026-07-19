@@ -413,7 +413,10 @@ verify_signature() {
   # carrying both the signature and the Fulcio certificate; the old detached
   # .sig/.pem pair is gone (release-ci #45). Verifying the new bundle format needs
   # cosign v3+ — an older cosign here degrades like a missing signature (below).
-  if ! fetch -o "$WORK_DIR/$CHECKSUMS.sigstore.json" "$base_url/$CHECKSUMS.sigstore.json"; then
+  # 2>/dev/null: this fetch is opportunistic — a release with no bundle is a
+  # clean skip below, not an error, so curl's own 404 noise must not leak (the
+  # mandatory archive/checksums fetches keep their diagnostics).
+  if ! fetch -o "$WORK_DIR/$CHECKSUMS.sigstore.json" "$base_url/$CHECKSUMS.sigstore.json" 2>/dev/null; then
     if [ "$REQUIRE_SIG" = 1 ]; then
       die "--require-signature was given but $TAG publishes no signature"
     fi
