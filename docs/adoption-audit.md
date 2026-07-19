@@ -69,8 +69,8 @@ reason.
 | 15 | `docs.yml` (mkdocs) | 1 | **shouldn't** | Clean absence everywhere else | Consumer-specific by nature; no drift cost |
 | 16 | e2e exerciser + `procure/` seam | 2 (dot-dagger, dstow by adoption) | **shouldn't** mandate; **can** document as the house pattern | Adopting the seam is opt-in | Useful convention; forcing it on gostow/hud buys nothing |
 | 17 | consumer break-glass `release.yml` naming wart | 4 | **should (ruled) → #41**: rename consumer-side file (e.g. `release-manual.yml`) | Pure rename, no behavior | Every consumer's break-glass shares release-ci's reusable workflow's filename; flagged by the survey, confusing in every incident. Costs one rename PR per repo, can ride the vendor PRs |
-| 19 | **gitleaks CI gate** (secret scan, full history, every ref) | 0 → all | ⚖️ **PROPOSED should — mandatory-defended** (2026-07-19, awaiting ruling) | Deliberately none, same defense as row 3: a repo that opts out of secret scanning weakens the org (a leaked signing PAT in any repo endangers all), not just itself. If the mandate is declined, demote to can | Baseline established 2026-07-19: full-history, all-refs scan of all six repos = **zero findings** (control-verified — a planted token is caught; AWS's documented example key is allowlisted by design). Bare pinned binary, not `gitleaks-action` (the action wrapper needs a paid license on org accounts — would couple the gate to a purchase at #11 migration time). Full-scan-every-run over diff-scan: largest repo scans in ~1s, and it re-verifies the whole exposure surface. Private repos are where this bites most: GitHub's own secret scanning doesn't cover them without paid Advanced Security, and dstow/hud/sorta flip public pre-first-release — anything buried becomes public then |
-| 20 | **pre-commit hook** (`.githooks/pre-commit`, gitleaks staged scan) | 0 → all | ⚖️ **PROPOSED should** (2026-07-19, awaiting ruling) | Opt-in by construction — git never auto-runs cloned hooks; activation is a one-time per-machine `git config --global core.hooksPath .githooks`, and the hook itself degrades F5-style (gitleaks absent → one notice, proceed). The hook is convenience; row 19 is the contract | Catches the secret **before it enters history** — CI catching it post-commit still means history surgery. Distributed through the installer's vendoring pipe (canonical file, byte-identical, consumer shellcheck); no config block needed (nothing per-consumer) |
+| 19 | **gitleaks CI gate** (secret scan, full history, every ref) | 0 → all | **should — mandatory-defended (ruled 2026-07-19)** → #44 | Deliberately none, same defense as row 3: a repo that opts out of secret scanning weakens the org (a leaked signing PAT in any repo endangers all), not just itself | Baseline established 2026-07-19: full-history, all-refs scan of all six repos = **zero findings** (control-verified — a planted token is caught; AWS's documented example key is allowlisted by design). Bare pinned binary, not `gitleaks-action` (the action wrapper needs a paid license on org accounts — would couple the gate to a purchase at #11 migration time). Full-scan-every-run over diff-scan: largest repo scans in ~1s, and it re-verifies the whole exposure surface. Private repos are where this bites most: GitHub's own secret scanning doesn't cover them without paid Advanced Security, and dstow/hud/sorta flip public pre-first-release — anything buried becomes public then |
+| 20 | **pre-commit hook** (`.githooks/pre-commit`, gitleaks staged scan) | 0 → all | **should — available-not-managed (ruled 2026-07-19)** → #44 | Opt-in by construction — git never auto-runs cloned hooks (RCE-by-clone prevention), so a one-time per-machine opt-in is irreducible. Shipped available, not machine-activated: the documented opt-in is a `hasconfig`-scoped `includeIf` (owner-matched, zero machine-wide blast radius); CI (row 19) is the sole enforcement. The hook is convenience; row 19 is the contract, and it degrades F5-style (gitleaks absent → one notice, proceed) | Catches the secret **before it enters history** — CI catching it post-commit still means history surgery. Distributed through the installer's vendoring pipe (canonical file, byte-identical, consumer shellcheck); no config block needed (nothing per-consumer) |
 | 18 | **sorta** | — | **RULED 2026-07-18: conventions bind, distribution vacuous** — `pr-title`/`release-please`/lint conventions apply (and centralize per row 5); `release.yml`/dryrun/smoke/`install.sh` are **shouldn't wire** — nothing to distribute (private, 0-asset tags) | n/a | Was the one genuine exception candidate under M13; now an explicit verdict, not an accreted default. Revisit only if sorta ever ships an artifact |
 
 ## Should-rows → implementation issues (filed 2026-07-18, post-ruling)
@@ -150,7 +150,7 @@ A consumer repo references release-ci at **exactly one version** across all its 
 same PR by hand until the dryrun surface is unified. Split pins are a bug (found live
 2026-07-18: v0.1.1/v0.1.2 in all four consumers).
 
-### gitleaks CI gate (row 19 — canonical job, pending ruling)
+### gitleaks CI gate (row 19 — canonical job, ruled 2026-07-19)
 
 ```yaml
   gitleaks:
@@ -175,19 +175,35 @@ release-asset downloads. `--log-opts="--all"` matters: default scans walk HEAD o
 a repo going public exposes **every pushed ref** (measured 2026-07-19: HEAD-only missed
 branch commits in 5 of 6 repos).
 
-### pre-commit hook (row 20 — pending ruling)
+### pre-commit hook (row 20 — ruled 2026-07-19: available-not-managed)
 
 Canonical file: release-ci `.githooks/pre-commit` — vendored byte-identical (no config
-block). Activation, once per dev machine:
+block). Git never auto-runs a hook that arrived in a clone (that would make `git clone`
+an RCE vector), so a one-time, per-machine opt-in is irreducible — no mechanism removes
+it. The hook therefore ships **available, not machine-activated**: CI (row 19) is the
+sole enforcement, and anyone who wants local pre-commit speed opts in.
 
-```console
-$ git config --global core.hooksPath .githooks
+The documented opt-in scopes by **repo owner via remote URL** (git 2.36+), so it applies
+to rocne's repos anywhere on disk and touches nothing else — in `~/.gitconfig`:
+
+```ini
+[includeIf "hasconfig:remote.*.url:git@github.com:rocne/**"]
+    path = ~/.gitconfig-rocne
 ```
 
-Repos without a `.githooks/` directory are unaffected. Caveat: a global hooksPath
-overrides per-repo `.git/hooks/`, so third-party repos that self-manage hooks (husky
-etc.) won't fire theirs — use per-repo `git config core.hooksPath .githooks` on machines
-where that matters.
+```ini
+# ~/.gitconfig-rocne
+[core]
+    hooksPath = .githooks
+```
+
+Why not global `core.hooksPath`: the blunt version makes **every** repo on the machine
+resolve hooks from `.githooks`, so repos without that directory silently run no hooks —
+a confusing machine-wide blast radius. The `hasconfig` scope avoids it. Local/most-
+specific config still wins, so a repo that sets its own `hooksPath` (husky, the Python
+`pre-commit` framework — which refuses to install when `core.hooksPath` is set) keeps its
+own behavior; that override direction is safe. Scratch/CI clones outside the scope don't
+get the hook — fine, because CI is the contract.
 
 ### Break-glass workflow name (#41)
 
