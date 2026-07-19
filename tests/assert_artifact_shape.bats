@@ -24,13 +24,13 @@ archive() {
   tar -C "$stage" -czf "$DIST/${proj}_${tag}_${os}_${arch}.tar.gz" "$binpath"
 }
 
-checksums() { # PROJECT TAG [skip]  — skip ∈ {"", nosig, nopem, nofile}
+checksums() { # PROJECT TAG [skip]  — skip ∈ {"", nobundle, nofile}
   local proj="$1" tag="$2" skip="${3:-}"
   local f="$DIST/${proj}_${tag}_checksums.txt"
   [ "$skip" = nofile ] && return 0
   echo "abc  ${proj}_${tag}_linux_amd64.tar.gz" >"$f"
-  [ "$skip" = nosig ] || echo sig >"$f.sig"
-  [ "$skip" = nopem ] || echo pem >"$f.pem"
+  # cosign v3 emits one Sigstore bundle instead of detached .sig/.pem (#45).
+  [ "$skip" = nobundle ] || echo bundle >"$f.sigstore.json"
 }
 
 good_dist() { # a full, conformant snapshot: two platforms, signed checksums
@@ -69,20 +69,12 @@ good_dist() { # a full, conformant snapshot: two platforms, signed checksums
   [[ "$output" == *"no linux_amd64 archive"* ]]
 }
 
-@test "missing checksums signature fails" {
+@test "missing checksums signature bundle fails" {
   archive gostow v0.0.0-dryrun linux amd64
-  checksums gostow v0.0.0-dryrun nosig
+  checksums gostow v0.0.0-dryrun nobundle
   run "$SUT_SHELL" "$SUT" gostow "$DIST"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"signature missing"* ]]
-}
-
-@test "missing checksums certificate fails" {
-  archive gostow v0.0.0-dryrun linux amd64
-  checksums gostow v0.0.0-dryrun nopem
-  run "$SUT_SHELL" "$SUT" gostow "$DIST"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"certificate missing"* ]]
+  [[ "$output" == *"signature bundle missing"* ]]
 }
 
 @test "missing checksums file fails" {
