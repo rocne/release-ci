@@ -141,13 +141,13 @@ jobs:
           BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
           CHECKSUMS="${{ inputs.project_name }}_${TAG}_checksums.txt"
           ARCHIVE="${{ inputs.project_name }}_${TAG}_linux_amd64.tar.gz"
-          curl -fsSL -o "$CHECKSUMS"     "$BASE/$CHECKSUMS"
-          curl -fsSL -o "$CHECKSUMS.sig" "$BASE/$CHECKSUMS.sig"
-          curl -fsSL -o "$CHECKSUMS.pem" "$BASE/$CHECKSUMS.pem"
-          curl -fsSL -o "$ARCHIVE"       "$BASE/$ARCHIVE"
+          curl -fsSL -o "$CHECKSUMS"               "$BASE/$CHECKSUMS"
+          curl -fsSL -o "$CHECKSUMS.sigstore.json" "$BASE/$CHECKSUMS.sigstore.json"
+          curl -fsSL -o "$ARCHIVE"                 "$BASE/$ARCHIVE"
+          # cosign v3 signs into a single Sigstore bundle (both signature and
+          # Fulcio cert); verify with --bundle, not the old --certificate/--signature.
           cosign verify-blob \
-            --certificate "$CHECKSUMS.pem" \
-            --signature   "$CHECKSUMS.sig" \
+            --bundle "$CHECKSUMS.sigstore.json" \
             --certificate-identity-regexp "^https://github\.com/rocne/release-ci/\.github/workflows/release\.yml@refs/tags/v" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$CHECKSUMS"

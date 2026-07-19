@@ -8,7 +8,7 @@
 #
 # The contract (D34), all four elements checked here:
 #   archive name     <project>_<tag>_<os>_<arch>.tar.gz
-#   checksums name   <project>_<tag>_checksums.txt  (+ .sig and .pem beside it)
+#   checksums name   <project>_<tag>_checksums.txt  (+ .sigstore.json beside it)
 #   archive internals  the binary at the archive root (man/, completions/ when shipped)
 #   build matrix     a linux_amd64 archive exists
 #
@@ -70,13 +70,14 @@ if [ -z "$amd64" ]; then
   violation "no linux_amd64 archive" "${PROJECT}_<tag>_linux_amd64.tar.gz"
 fi
 
-# --- element 2: checksums file plus its cosign signature and certificate ---
+# --- element 2: checksums file plus its cosign Sigstore bundle ---
+# cosign v3 emits one bundle (signature + Fulcio cert) instead of the old
+# detached .sig/.pem pair (release-ci #45).
 checksums=$(find "$DIST" -maxdepth 1 -name "${PROJECT}_*_checksums.txt" -type f | sort | head -n 1)
 if [ -z "$checksums" ]; then
   violation "no checksums file" "${PROJECT}_<tag>_checksums.txt"
 else
-  [ -f "${checksums}.sig" ] || violation "checksums signature missing" "$(basename "$checksums").sig beside the checksums file"
-  [ -f "${checksums}.pem" ] || violation "checksums certificate missing" "$(basename "$checksums").pem beside the checksums file"
+  [ -f "${checksums}.sigstore.json" ] || violation "checksums signature bundle missing" "$(basename "$checksums").sigstore.json beside the checksums file"
 fi
 
 # --- element 3: the binary sits at the archive root ---

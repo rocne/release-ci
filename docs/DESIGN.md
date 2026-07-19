@@ -570,6 +570,7 @@ the **exit-code / stream / effect** split asserted independently (F6).
 | **D32** | **Resolve "latest" via the `releases/latest` redirect, not the JSON API** (§6.5). The API is rate-limited at 60/hr/IP unauthenticated and fails behind shared egress — exactly where bootstrap runs |
 | **D33** | **`--help` is a `usage()` heredoc; never read from `$0`** (§6.6). The shipped scripts' self-read idiom prints a `sed` error and **exits 0** under `curl \| sh -s -- --help` — verified 2026-07-17. Replaces §13 #20's endorsed-but-broken idiom |
 | **D34** | **The artifact shape is a named contract** (below). Asset `name_template`, checksums filename, archive-internal `man/` + `completions/` layout, and a `linux_amd64` build all live in **four per-consumer GoReleaser files** and are consumed by the installer, the verify job, the smoke, and D20's detection — uniform today only by copy-paste. D30's original disease, found by auditing for it (M12). Stated once, asserted in `release-dryrun` |
+| **D35** | **The signature is a cosign v3 Sigstore bundle, not a detached `.sig`/`.pem` pair** *(2026-07-19, #45)*. cosign v3's `sign-blob` removed detached `--output-signature`/`--output-certificate`; its only output is one `<checksums>.sigstore.json` bundle carrying both. So the D34 artifact shape sheds the `.sig`+`.pem` pair for a single `.sigstore.json`, and every verifier moves from `--certificate`/`--signature` to `--bundle`: the reusable `release.yml` verify job, the installer's F5 `verify_signature`, the D34 dryrun assert, and each consumer's `release-dryrun.yml`. **The trigger was a Dependabot bump auto-merged to the signing surface** (`cosign-installer` 3.9.1→4.1.2 silently carried cosign v2→v3), so the goreleaser `signs:` block and the release.yml installer must always agree on the cosign major — bumps touching signing steps are reviewed, never auto-merged. **User-side cost:** verifying the new bundle needs cosign v3+; an older cosign degrades like a missing signature (F5 skip, or abort under `--require-signature`) |
 
 **D19 — the downshift is established practice.** The convention: major pinned at 0,
 breaking → **minor**, feature → **patch**. **This is not ours.** VERIFIED from primary
@@ -634,7 +635,7 @@ config must produce, because four things already depend on it:
 | element | shape | consumed by |
 |---|---|---|
 | archive name | `{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}.tar.gz` | installer download; verify job (`release.yml:122`) |
-| checksums name | `{{ .ProjectName }}_{{ .Tag }}_checksums.txt` (+ `.sig`/`.pem` beside it) | installer F4/F5; verify job |
+| checksums name | `{{ .ProjectName }}_{{ .Tag }}_checksums.txt` (+ `.sigstore.json` cosign bundle beside it — D35) | installer F4/F5; verify job |
 | archive internals | binary at root; man pages under `man/`, completions under `completions/` | installer install step; D20's detection |
 | build matrix | `linux_amd64` exists | verify job's fixture choice; the smoke |
 

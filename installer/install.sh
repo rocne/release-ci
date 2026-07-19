@@ -17,7 +17,7 @@
 # Artifact-shape contract (D34) — what this script consumes; asserted by each
 # consumer's release-dryrun, produced by its GoReleaser config:
 #   <tool>_<tag>_<os>_<arch>.tar.gz          the archive, binary at its root
-#   <tool>_<tag>_checksums.txt (+ .sig/.pem) checksums and cosign signature
+#   <tool>_<tag>_checksums.txt (+ .sigstore.json) checksums + cosign bundle
 #   man/ and completions/ inside the archive when the tool ships them
 #
 # Positioning, honestly (§6.9): presence-checking by default is a minority
@@ -82,7 +82,10 @@ Behavior:
   Already installed and no flags → one status line, exit 0, no network.
   Found elsewhere on PATH (apt/brew) → not shadowed; says so, exit 0.
   Checksum verification is mandatory: no sha256sum/shasum → abort.
-  cosign, when present, verifies the release signature (Sigstore).
+  cosign, when present, verifies the release signature (Sigstore). The release
+  is signed as a Sigstore bundle (new format), so verification needs cosign v3+;
+  an older cosign is treated like a missing signature (skipped, or aborts under
+  --require-signature).
 
 Exit codes: 0 success or no-op · 1 runtime failure · 2 usage error
 EOF
@@ -406,8 +409,11 @@ verify_signature() {
     return 0
   fi
   base_url="https://github.com/$REPO/releases/download/$TAG"
-  if ! fetch -o "$WORK_DIR/$CHECKSUMS.sig" "$base_url/$CHECKSUMS.sig" \
-    || ! fetch -o "$WORK_DIR/$CHECKSUMS.pem" "$base_url/$CHECKSUMS.pem"; then
+  # cosign v3 signs blobs into a single Sigstore bundle (checksums.txt.sigstore.json)
+  # carrying both the signature and the Fulcio certificate; the old detached
+  # .sig/.pem pair is gone (release-ci #45). Verifying the new bundle format needs
+  # cosign v3+ — an older cosign here degrades like a missing signature (below).
+  if ! fetch -o "$WORK_DIR/$CHECKSUMS.sigstore.json" "$base_url/$CHECKSUMS.sigstore.json"; then
     if [ "$REQUIRE_SIG" = 1 ]; then
       die "--require-signature was given but $TAG publishes no signature"
     fi
@@ -416,8 +422,7 @@ verify_signature() {
   fi
   signer_re=$(printf '%s' "$SIGNER_REPO" | sed 's/\./\\./g')
   if cosign verify-blob \
-      --certificate "$WORK_DIR/$CHECKSUMS.pem" \
-      --signature   "$WORK_DIR/$CHECKSUMS.sig" \
+      --bundle "$WORK_DIR/$CHECKSUMS.sigstore.json" \
       --certificate-identity-regexp "^https://github\\.com/${signer_re}/\\.github/workflows/release\\.yml@refs/tags/v" \
       --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
       "$WORK_DIR/$CHECKSUMS" >/dev/null 2>&1; then

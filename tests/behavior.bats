@@ -324,6 +324,7 @@ resolved_install_line() { # ARGS... — echo the dry-run's resolved install path
 
 @test "with cosign present, the signature is verified" {
   command -v cosign >/dev/null 2>&1 || skip "cosign not installed here"
+  fixture_has_bundle || skip "fixture v$FIXTURE_VERSION predates the cosign v3 bundle shape (#45)"
   run_sut --install-dir "$INSTALL_DIR" --version "v$FIXTURE_VERSION"
   assert_status 0
   assert_stderr_contains "signature verified"
@@ -331,6 +332,7 @@ resolved_install_line() { # ARGS... — echo the dry-run's resolved install path
 
 @test "--require-signature succeeds when cosign is present" {
   command -v cosign >/dev/null 2>&1 || skip "cosign not installed here"
+  fixture_has_bundle || skip "fixture v$FIXTURE_VERSION predates the cosign v3 bundle shape (#45)"
   run_sut --install-dir "$INSTALL_DIR" --version "v$FIXTURE_VERSION" --require-signature
   assert_status 0
   assert_stderr_contains "signature verified"

@@ -52,6 +52,16 @@ fixture_binary() {
   echo "$cache/$FIXTURE_TOOL"
 }
 
+# True iff the fixture release publishes a cosign v3 Sigstore bundle beside its
+# checksums. gostow v0.4.0 predates the v3 migration (#45) and carries the old
+# detached .sig/.pem instead; the signature-verify tests skip against such a
+# release and auto-run once FIXTURE_VERSION advances to a re-pressed one.
+fixture_has_bundle() {
+  curl -fsSL -o /dev/null \
+    "https://github.com/$FIXTURE_REPO/releases/download/v$FIXTURE_VERSION/${FIXTURE_TOOL}_v${FIXTURE_VERSION}_checksums.txt.sigstore.json" \
+    2>/dev/null
+}
+
 # run_sut ARGS... — run the vendored script under $SUT_SHELL. stdout must be
 # empty on every path (the stderr-only convention), so that is asserted here,
 # once, for every invocation in the suite.
