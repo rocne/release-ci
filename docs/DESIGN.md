@@ -253,7 +253,8 @@ implies *something* does the baking — and what died was a *generator*.
 ```sh
 # ---- vendored config (per-consumer; everything below is canonical) ----
 REPO=""                          # GitHub slug, e.g. rocne/dot-dagger. Set at vendor time.
-TOOL=""                          # installed binary name, e.g. dotd. NOT always the repo slug.
+BIN=""                           # installed binary name; defaults to the repo name, set
+                                  # only when it diverges (e.g. dot-dagger -> dotd).
 SIGNER_REPO="rocne/release-ci"   # Fulcio identity the release is signed as (D25)
 # ---- end vendored config ----
 ```
@@ -268,10 +269,10 @@ comment *"binary name = repo slug"* — **false for dot-dagger** (repo `dot-dagg
 - **It is a working script, not a template.** No render step, no placeholder syntax.
   **Correction to an earlier draft**: that draft claimed the canonical copy runs "with
   release-ci's own values" — **wrong, release-ci ships no binary**. The canonical copy has
-  `REPO=""` and `TOOL=""` and **aborts with a usage error** (*"install.sh: REPO/TOOL are
+  `REPO=""` and `BIN=""` and **aborts with a usage error** (*"install.sh: REPO/BIN are
   unset — this is the canonical source; vendor it and set the config block"*). That keeps
   it a real, shellcheck-able, *executable* script that fails cleanly, rather than a
-  template with placeholders. Tests set `REPO=rocne/gostow TOOL=gostow`.
+  template with placeholders. Tests set `REPO=rocne/gostow` (`BIN` defaults from it).
 - **Vendoring** = copy the file, set the block. **Propagation** = replace everything *below*
   the block, preserve the block. A `sed`/`awk` range operation — honestly, a tiny generator,
   which is why the invariant is **named and checkable**: everything below the marker is
@@ -309,12 +310,12 @@ Consumers depend on **nothing** beyond F1–F6.
 
 **Presence check (D16)** — check **both**, install path first:
 
-1. **Resolved install path first.** If `$INSTALL_DIR/$TOOL` exists (and, when `--version`
+1. **Resolved install path first.** If `$INSTALL_DIR/$BIN` exists (and, when `--version`
    is given, reports that version — see D28/D30) → status line **naming the installed
    version**, exit 0. Naming it matters: exit-0 must not be mistakable for "latest".
    *Why first*: it **converges**. Checking only the wider PATH means a custom install dir
    that isn't on `PATH` reinstalls **forever**, never satisfying its own check.
-2. **Then `command -v $TOOL`.** If found elsewhere — e.g. `/usr/bin/$TOOL` from apt — →
+2. **Then `command -v $BIN`.** If found elsewhere — e.g. `/usr/bin/$BIN` from apt — →
    status line naming the location, exit 0. **Do not silently shadow a package-managed
    install.** Exception: an explicit `--version` that the found copy does not satisfy
    installs to `$INSTALL_DIR` anyway (the user asked for a version, not a location) and
@@ -328,7 +329,7 @@ otherwise install. Only `--force` unconditionally reinstalls. The earlier F2 inh
 dstow B6's *"`--version` implies force"* verbatim, which contradicted F1 (present at the
 requested version: F1 said exit 0, F2 said reinstall) and failed D16's own convergence
 principle for any script that pins a version (§13 #18). Version matching requires reading
-the installed tool's version — `$TOOL --version`, parsed per D30's rule (first
+the installed tool's version — `$BIN --version`, parsed per D30's rule (first
 semver-shaped token on the first line; the smoke's substring grep at `release.yml:201` was
 already format-agnostic). **Degradation is defined**: if the installed binary cannot be
 executed (wrong arch, corrupted) or no version parses from its first line, ensure treats
@@ -354,7 +355,7 @@ proposed both.**
 | | source | note |
 |---|---|---|
 | 1 | `--install-dir <path>` | **renamed from `--dir`** (D11). Pairs with the env var below; fnm's spelling. Change the two shipped scripts |
-| 2 | `<TOOL>_INSTALL_DIR` | namespaced, baked from the **binary name** (`GOSTOW_…`, `DOTD_…` — `TOOL`, not the repo slug). **No surveyed installer exposes a bare one** |
+| 2 | `<BIN>_INSTALL_DIR` | namespaced, baked from the **binary name** (`GOSTOW_…`, `DOTD_…` — `BIN`, which defaults to the repo slug but isn't always it). **No surveyed installer exposes a bare one** |
 | 3 | `$XDG_BIN_HOME` | follows **uv specifically** (1 of 15 surveyed), not a broad norm |
 | 4 | `~/.local/bin` | default (F3) |
 
@@ -433,7 +434,7 @@ answer isn't per-consumer preference; it's: **install them whenever the tool has
 Which the script can determine **itself**: the archive either contains `man/` and
 `completions/` or it does not. **Look, don't ask.** `--bin-only` still declines at runtime.
 
-Two wins: `INSTALL_MAN` disappears (the config block shrinks to `REPO` + `TOOL` +
+Two wins: `INSTALL_MAN` disappears (the config block shrinks to `REPO` + `BIN` +
 `SIGNER_REPO`, which strengthens D6 — less config is less generator-pressure), and
 dot-dagger gets man pages the day it ships them, with no vendored-config change and nobody
 remembering to flip a flag.
@@ -543,10 +544,10 @@ the **exit-code / stream / effect** split asserted independently (F6).
 | **D5** | Deliver by vendoring, from each consumer's own raw-on-`main` URL |
 | **D6** | Parameterize via a **config block in a real script**; never a generator or template engine (§6.3) |
 | **D7** | The floor is F1–F6 (§6.4) |
-| **D8** | Install-dir env var is **namespaced** (`<TOOL>_INSTALL_DIR`); bare `INSTALL_DIR` **dropped outright** (see D21 — this row previously said "deprecated" and was never updated after D21 reversed; §13 #14's class) |
+| **D8** | Install-dir env var is **namespaced** (`<BIN>_INSTALL_DIR`); bare `INSTALL_DIR` **dropped outright** (see D21 — this row previously said "deprecated" and was never updated after D21 reversed; §13 #14's class) |
 | **D9** | Install dir is **tunable**; the *default* is contractual — declines dstow B6 with a counter-offer |
 | **D10** | Four output levels; all human output to stderr; exit code independent of level |
-| **D11** | **`--install-dir`, renamed from `--dir`** — pairs with `<TOOL>_INSTALL_DIR`; fnm's spelling. *Re-derived*: the old reasoning was "matches both shipped scripts," i.e. incumbency |
+| **D11** | **`--install-dir`, renamed from `--dir`** — pairs with `<BIN>_INSTALL_DIR`; fnm's spelling. *Re-derived*: the old reasoning was "matches both shipped scripts," i.e. incumbency |
 | **D12** | Drop `VALID_TOOLS` positional, `printf '%q'`, `--update` |
 | **D13** | mise is an **additional channel** (`github` backend), not a replacement; `go` backend never |
 | **D14** | Verify before citing; dstow's installer survey is unreliable prior art |
@@ -557,7 +558,7 @@ the **exit-code / stream / effect** split asserted independently (F6).
 | **D19** | **Adopt the downshift — it is established practice, not our invention** (below). Resolves Q6 |
 | **D20** | **Man/completions: detect from the archive, don't configure.** *Re-derived* — `INSTALL_MAN` encoded today's accident as tomorrow's config. `--bin-only` still declines. Shrinks the config block (§6.6). Resolves Q7 |
 | **D21** | **Bare `INSTALL_DIR` is dropped outright — no deprecation window.** *Re-derived, reversed*: the "compatibility fallback" preserved the exact collision bug that namespacing exists to fix (§6.5). Resolves Q9 |
-| **D22** | `install.sh` lives at **`installer/install.sh`** here (with `snippet.sh` beside it, D26) — not repo root, which would imply release-ci installs something. Canonical copy has `REPO=""`/`TOOL=""` and aborts with a usage error. Resolves Q10 |
+| **D22** | `install.sh` lives at **`installer/install.sh`** here (with `snippet.sh` beside it, D26) — not repo root, which would imply release-ci installs something. Canonical copy has `REPO=""`/`BIN=""` and aborts with a usage error. Resolves Q10 |
 | **D23** | **Go stays on `actions/setup-go`** — mise's `core:go` cannot read `go.mod` (below). Resolves Q11 |
 | **D24** | **Propose declining #6** (mise in CI) — its case collapsed once Go was excluded (below) |
 | **D25** | **The Fulcio signer identity is a config-block variable** (`SIGNER_REPO`), not a literal. The org migration otherwise hard-aborts every cosign-having install; the consumer-side literals become 1 vendored value, leaving 2 sites in release-ci's own `release.yml` (§9, #11 — inventory corrected 2026-07-17) |
@@ -789,7 +790,7 @@ and starts being a design.
 | 12 | **Every apt/dnf machine holds a root-owned source entry baking the Cloudsmith slug** — on a slug change it silently stops updating rather than failing. The durable-artifact inventory had missed its most durable member | all apt/dnf users | §9, #11 |
 | 13 | **`brew` references `rocne/homebrew-tap` from user machines**; covered by transfer redirects only while the namespace is never freed | brew users | §9, #11 |
 | 14 | **Go module paths don't migrate** — `go install github.com/rocne/…` is advertised, and the `module` line either stays `rocne` forever or breaks existing installs | go-install users | §9, #11 |
-| 15 | **`$TOOL --version` output is already a cross-repo contract with zero documentation** — the release smoke greps it, D28's version match will parse it. Resolved as a **parse rule** (first semver on line 1), not a format — a strict format was over-firm (M12) | all | D30 |
+| 15 | **`$BIN --version` output is already a cross-repo contract with zero documentation** — the release smoke greps it, D28's version match will parse it. Resolved as a **parse rule** (first semver on line 1), not a format — a strict format was over-firm (M12) | all | D30 |
 | 19 | **Your GoReleaser config is load-bearing for four other things** — asset names, checksums name, archive layout, and a linux_amd64 build are consumed by the installer, verify job, smoke, and D20, and nothing asserts any of it. D30's disease, second instance | all | D34 |
 | 16 | **Neither shipped installer is truncation-safe** — a dropped `curl \| sh` connection executes a prefix of the script. mise.run and rustup wrap everything in functions with one trailing call | all curl\|sh users | D31 |
 | 17 | **"Latest" resolution burns an unauthenticated API call** rate-limited at 60/hr/IP — it fails behind CI and office NAT, exactly where bootstrap runs | CI, shared-egress users | D32 |
@@ -993,7 +994,8 @@ roadmap, with the block-dependencies shown.
 *Blocked on release-ci #1 (canonical installer exists):*
 
 3. **Replace `install.sh`** (221 hand-rolled lines) with the vendored canonical; config
-   block `REPO="rocne/gostow"`, `TOOL="gostow"`. Net behaviour changes, for the release
+   block `REPO="rocne/gostow"` (`BIN` needs no explicit value — it matches the repo name).
+   Net behaviour changes, for the release
    notes: **`--dir` → `--install-dir`** (D11); **bare `INSTALL_DIR` dropped** →
    `GOSTOW_INSTALL_DIR` (D21, clean break); presence check now default-on (F1/D16);
    `--version` = ensure (D28); gains truncation safety (D31), redirect-based latest (D32),
@@ -1014,7 +1016,7 @@ roadmap, with the block-dependencies shown.
 *Blocked on release-ci #1:*
 
 3. **Replace `install.sh`** (186 lines); config block `REPO="rocne/dot-dagger"`,
-   `TOOL="dotd"` — the exact pair that forced the block's `REPO`/`TOOL` split (§6.3).
+   `BIN="dotd"` — the exact pair that forced the block's `REPO`/`BIN` split (§6.3).
    Removals, per D12: the `VALID_TOOLS` positional (dead generality, one entry) and with
    it the **non-POSIX `printf '%q'`** on its error path. Same release-notes items as
    gostow (`--install-dir`, `DOTD_INSTALL_DIR`, presence check, D28).
@@ -1041,7 +1043,8 @@ nothing else waits on intent.
    `CLOUDSMITH_API_KEY`, `HOMEBREW_TAP_GITHUB_TOKEN` — the three dstow's design also
    names); D30 parse rule asserted (the smoke will grep it on release day); a green
    `release-dryrun` run.
-4. **Vendor `install.sh` with the family** (`REPO="rocne/hud"`, `TOOL="hud"`) — M13
+4. **Vendor `install.sh` with the family** (`REPO="rocne/hud"`; `BIN` needs no explicit
+   value — it matches the repo name) — M13
    removed the on-first-release gating this item carried. Safe to ship before any release
    exists: a 0-release repo's vendored installer exits 1 with an honest *"no published
    release yet"* (behavior added by the pre-vendor review fixes, #34). The mise stanza
@@ -1051,8 +1054,8 @@ nothing else waits on intent.
 
 dstow's first release blocks on release-ci #1 (its B3, no fallback — dstow's choice, §2).
 
-1. **Vendor `install.sh`** (`REPO="rocne/dstow"`, `TOOL="dstow"`) **and `snippet.sh`
-   beside it** (D26).
+1. **Vendor `install.sh`** (`REPO="rocne/dstow"`; `BIN` needs no explicit value — it
+   matches the repo name) **and `snippet.sh` beside it** (D26).
 2. **Implement `dstow snippet rc` as a `go:embed` reader of the vendored `snippet.sh`.**
    Verified 2026-07-17: **no snippet code exists yet** — this is greenfield, not rework,
    and it satisfies dstow's own B2 ("real files, diffable, shellcheck-able; never string
