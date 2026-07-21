@@ -16,13 +16,13 @@ ALT_VERSION="0.3.0"       # a second real release, for ensure-mismatch cases
 
 vendor_install_sh() { # DEST — mimic vendoring: set the config block
   sed -e "s|^REPO=\"\"|REPO=\"$FIXTURE_REPO\"|" \
-      -e "s|^TOOL=\"\"|TOOL=\"$FIXTURE_TOOL\"|" \
+      -e "s|^BIN=\"\"|BIN=\"$FIXTURE_TOOL\"|" \
       "$REPO_ROOT/installer/install.sh" >"$1"
 }
 
 vendor_snippet_sh() { # DEST
   sed -e "s|^RELEASE_CI_REPO=\"\"|RELEASE_CI_REPO=\"$FIXTURE_REPO\"|" \
-      -e "s|^RELEASE_CI_TOOL=\"\"|RELEASE_CI_TOOL=\"$FIXTURE_TOOL\"|" \
+      -e "s|^RELEASE_CI_BIN=\"\"|RELEASE_CI_BIN=\"$FIXTURE_TOOL\"|" \
       "$REPO_ROOT/installer/snippet.sh" >"$1"
 }
 
