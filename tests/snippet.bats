@@ -26,7 +26,7 @@ source_snippet() {
     $1
     . '$SNIPPET'
     rc=\$?
-    [ -z \"\${RELEASE_CI_REPO+x}\" ] && [ -z \"\${RELEASE_CI_TOOL+x}\" ] || echo 'LEAK' >&2
+    [ -z \"\${RELEASE_CI_REPO+x}\" ] && [ -z \"\${RELEASE_CI_BIN+x}\" ] || echo 'LEAK' >&2
     echo \"PATH=\$PATH\" >&2
     exit \$rc
   "
