@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - run: shellcheck installer/install.sh installer/snippet.sh release-dryrun/assert-artifact-shape.sh release-dryrun/assert-version-contract.sh .githooks/pre-commit
+      - run: shellcheck installer/install.sh installer/snippet.sh release-dryrun/assert-artifact-shape.sh release-dryrun/assert-version-contract.sh release-dryrun/assert-vendored-installer.sh .githooks/pre-commit
 
   # Secret scan, full history, every ref (adoption audit row 19). The bare
   # pinned binary, not gitleaks/gitleaks-action: the action wrapper requires a
