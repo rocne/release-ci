@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/rocne/release-ci/compare/v0.1.4...v0.1.5) (2026-07-23)
+
+
+### Features
+
+* assert vendored install.sh has not drifted from canonical ([#53](https://github.com/rocne/release-ci/issues/53)) ([#54](https://github.com/rocne/release-ci/issues/54)) ([810b7fe](https://github.com/rocne/release-ci/commit/810b7fe555a6b5f0f3a1fefa386b1823fea8916c))
+
 ## [0.1.4](https://github.com/rocne/release-ci/compare/v0.1.3...v0.1.4) (2026-07-19)
 
 
