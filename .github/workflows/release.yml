@@ -58,7 +58,46 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Non-bypassable vendored-installer gate (D37). The caller's repo-root install.sh
+  # must match this release-ci's canonical installer outside the config block, or
+  # the release is blocked before anything is signed (`release` needs: this job).
+  # A consumer cannot ship a drifted, signature-skipping installer under the
+  # rocne/release-ci signing identity: the only way past the gate is to stop
+  # calling the pipeline, which forfeits that identity. The consumer's own ci.yml
+  # `installer-drift` job (D36) stays as fast per-push feedback; this is the
+  # enforceable floor. Residual: this gates at release time only — a drifted
+  # install.sh sitting on raw-on-`main` *between* releases (the file users
+  # curl | sh) is out of scope here, a continuous-verification problem.
+  installer-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the caller repo (its vendored install.sh)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Same self-consistent fetch as the Cloudsmith requirements below: the
+      # canonical installer + the drift assertion at the EXACT release-ci SHA
+      # executing here — the tag the caller pinned — never a mutable ref. The
+      # assert script resolves its default canonical to installer/install.sh in
+      # its own (this) tree, so both paths are checked out together.
+      - name: Fetch canonical installer + drift assertion from pinned release-ci
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .release-ci
+          persist-credentials: false
+          sparse-checkout: |
+            release-dryrun/assert-vendored-installer.sh
+            installer/install.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Assert vendored install.sh has not drifted from canonical
+        run: sh .release-ci/release-dryrun/assert-vendored-installer.sh ./install.sh
+
   release:
+    needs: installer-drift
     permissions:
       contents: write
       id-token: write

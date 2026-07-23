@@ -7,6 +7,12 @@
 # elsewhere is a propagation bug — the class that left consumers on the old
 # cosign-v2 verify path after the v3 installer shipped upstream (#52).
 #
+# The block itself is diff-exempt, so its contents are also constrained (D37):
+# only comments and assignments to the three sanctioned variables may appear
+# between the markers, or the block becomes a place to hide arbitrary lines from
+# the byte-identity diff. This gate is also run non-bypassably from the inherited
+# release.yml, so a drifted install.sh blocks a signed release (D37).
+#
 # Canonical source: rocne/release-ci, release-dryrun/assert-vendored-installer.sh;
 # consumed by each consumer via a tag-pinned checkout of release-ci (owned once,
 # never copied) and run in its own CI against its repo-root install.sh, so a
@@ -19,7 +25,9 @@
 #   canonical-install.sh    defaults to installer/install.sh in this script's own
 #                           release-ci tree ($script_dir/../installer/install.sh).
 #
-# Exit: 0 identical outside the config block; 1 drift; 2 usage/structural error.
+# Exit: 0 identical outside the config block and the block is well-formed;
+#       1 drift, or an unsanctioned line inside the config block;
+#       2 usage/structural error.
 
 set -eu
 
@@ -54,6 +62,41 @@ for f in "$CONSUMER" "$CANONICAL"; do
     exit 2
   fi
 done
+
+# The config block is diff-exempt, so whatever a consumer puts between the
+# markers is otherwise unchecked — an injection point that hides from the
+# byte-identity diff (D37). Constrain it: inside the block only comments, blank
+# lines, and assignments to the three sanctioned variables (REPO, BIN,
+# SIGNER_REPO), plus the canonical BIN default if a consumer keeps it in-block,
+# are allowed. The quoted value forbids `$` and backtick (no expansion or
+# command substitution), and the anchor forbids anything after the closing quote
+# but whitespace and a comment (no `;`/`&&` statement chaining). Anything else is
+# an unreviewed line the diff would silently pass — reject it. Only the consumer
+# copy is validated; the canonical block is in-repo and reviewed.
+validate_block() {
+  awk -v s="$START" -v e="$END" '
+    index($0, s) == 1 { inblk = 1; next }
+    index($0, e) == 1 { inblk = 0; next }
+    !inblk { next }
+    /^[ \t]*$/ { next }                                                   # blank
+    /^[ \t]*#/ { next }                                                   # comment
+    /^(REPO|BIN|SIGNER_REPO)="[^"$`]*"[ \t]*(#.*)?$/ { next }             # sanctioned assignment
+    # The in-block BIN default, as a STRING regex not a /.../ constant: it
+    # contains a literal "/", which busybox/mawk lex as the end of a /.../ regex.
+    $0 ~ "^BIN=\"[$][{]BIN:-[$][{]REPO##[*][/][}][}]\"[ \t]*(#.*)?$" { next }
+    { print NR ": " $0; bad = 1 }
+    END { exit bad ? 1 : 0 }
+  ' "$1"
+}
+
+if ! offending=$(validate_block "$CONSUMER"); then
+  echo "::error::vendored config block contains unsanctioned line(s): $CONSUMER" >&2
+  echo "  only comments and REPO=/BIN=/SIGNER_REPO= assignments may appear between the" >&2
+  echo "  '# ---- vendored config ----' markers — the block is diff-exempt, so any other" >&2
+  echo "  line is an unreviewed injection point (DESIGN.md D37). Offending line(s):" >&2
+  printf '%s\n' "$offending" | sed 's/^/    /' >&2
+  exit 1
+fi
 
 # Drop the block's contents (between the markers; the markers themselves are
 # kept, so the surrounding lines stay aligned) so the sanctioned per-consumer
