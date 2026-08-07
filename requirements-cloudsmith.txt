@@ -251,9 +251,9 @@ cloudsmith-api==2.0.29 \
     --hash=sha256:57771b2c7cfe681d685273dfcfd214dd36c2775d9fc080122b40b4d6c404c452 \
     --hash=sha256:db3cc74f5bfa96dd773c30251d681622405d5a0aa05bcead527e02cb9d744035
     # via cloudsmith-cli
-cloudsmith-cli==1.19.0 \
-    --hash=sha256:311bd43087307a5b581ade796dfbef778c407405561a113994981fcccd629917 \
-    --hash=sha256:d2be2eebbfcff741a068ce7f500ba7fcbd1ba395baf248b25312237d6d7ef246
+cloudsmith-cli==1.21.0 \
+    --hash=sha256:2fa363e62f781359790602f54dc75443595906f4e8f22e52ecf4eb9f25bd21ad \
+    --hash=sha256:990995cce7c40c710ae589a20119c55a088fede7ba0d8abefaecf438c1f4b041
     # via -r requirements-cloudsmith.in
 configparser==7.2.0 \
     --hash=sha256:b629cc8ae916e3afbd36d1b3d093f34193d851e11998920fdcfc4552218b7b70 \
