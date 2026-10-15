@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/rocne/release-ci/compare/v0.1.5...v0.1.6) (2026-07-25)
+
+
+### Features
+
+* enforce vendored-installer check at release time; constrain config block ([#57](https://github.com/rocne/release-ci/issues/57)) ([9c80fbc](https://github.com/rocne/release-ci/commit/9c80fbc72d0cae85b65e0b48c738607aae79bc2a))
+
 ## [0.1.5](https://github.com/rocne/release-ci/compare/v0.1.4...v0.1.5) (2026-07-23)
 
 
